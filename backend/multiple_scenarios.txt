@@ -1,0 +1,3 @@
+Customer Demographics Redacted
+
+region, income, age

@@ -1,0 +1,11 @@
+cookie:
+  expiry_days: 30
+  key: "dfab91341"
+  name: "carbonsight-cookie"
+credentials:
+  usernames:
+    reviewer:
+      email: reviewer
+      failed_login_attempts: 0 # Will be managed automatically
+      logged_in: False # Will be managed automatically
+      password: review-carbonsight # Will be hashed automatically

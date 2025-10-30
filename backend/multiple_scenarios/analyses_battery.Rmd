@@ -1,0 +1,156 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggpubr)
+
+```
+
+
+
+```{r}
+# read folders and variables
+main_folder_path <- "~/Desktop/default_progress_phev"
+
+
+system_folders <- system(paste0("ls ", main_folder_path ), intern = TRUE)
+
+df_wide <- data.frame(scenarios = system_folders)
+#df_wide["scenarios"] %>% stringr::str_split(";") %>% stringr::str_split("=")  %>% unique()
+
+var_names_main <- c("production_ghg_cost_kwh", "veh_mpg", "veh_mpge", "electricity_ghg_kwh", "gas_ghg_gallon")
+df_wide[var_names_main] <- NA
+
+var_names_with_levels <- c()
+
+v1 <- c()
+v2 <- c()
+
+all_scenarios <- df_wide["scenarios"]  %>% as.list()
+for (i in 1:nrow(df_wide)){
+  scenario <- df_wide[i, "scenarios"]
+  print(i)
+  var_names_with_levels  <- c(scenario %>% stringr::str_split(";") %>% unlist()) %>% unique()
+  for (var_name_with_level in var_names_with_levels){
+    str1 <- var_name_with_level %>% stringr::str_split("=") %>% unlist() %>% unname()
+    v1 <- c(v1, str1[2])
+    v2 <- c(v2, var_name_with_level)
+    #print(v1)
+
+    df_wide[i, str1[1]] <- str1[2]
+  }
+}
+
+
+df_wide$use_ghg <- NA
+df_wide$production_ghg <- NA
+df_wide$disposal_ghg <- NA
+counter = 0
+
+used_market_df_all <- data.frame()
+disposed_df_all <- data.frame()
+
+for (scenario in df_wide$scenarios){
+  used_market_df <- read.csv(paste0(main_folder_path,"/",scenario, "/current_veh_t1_used_market_out.csv")) 
+  disposed_df <- read.csv(paste0(main_folder_path,"/",scenario, "/disposed_veh_t1_out.csv")) 
+
+  used_market_df <- used_market_df  %>% filter(scenario != "default", powertrain == "phev", year < 10)
+  disposed_df <- disposed_df  %>% filter(scenario != "default", powertrain == "phev", year < 10)
+  
+  used_market_df$scenarios <- scenario
+  disposed_df$scenarios <- scenario
+#  used_market_df_all <- bind_rows(used_market_df_all, used_market_df)
+#  disposed_df_all <- bind_rows(disposed_df_all, disposed_df)
+  
+  
+
+  
+  use_ghg <- sum(used_market_df$use_ghg, na.rm = TRUE)
+  production_ghg <- sum(used_market_df$production_ghg, na.rm = TRUE)
+  disposal_ghg <- sum(disposed_df$ghg_cost_x_n, na.rm = TRUE)
+  
+
+  df_wide[df_wide$scenarios == scenario, "use_ghg"] <- use_ghg
+  df_wide[df_wide$scenarios == scenario, "production_ghg"] <- production_ghg
+  df_wide[df_wide$scenarios == scenario, "disposal_ghg"] <- disposal_ghg
+  if (counter%%10 == 0) {
+    print(counter)
+  }
+  
+  counter <- counter + 1
+}
+
+df_wide <- df_wide[complete.cases(df_wide),]
+print(1)
+```
+```{r}
+x <- df_wide %>% filter(veh_mpg == "p", veh_mpge == "p") %>% select(use_ghg)   %>% unlist()
+
+x %>% hist()
+
+x <- df_wide %>% filter(veh_mpg == "p", veh_mpge == "d") %>% select(use_ghg)   %>% unlist()
+
+x %>% hist()
+```
+
+```{r}
+# c("production_ghg_cost_kwh", "veh_mpg", "veh_mpge", "electricity_ghg_kwh", "gas_ghg_gallon")
+used_market_df_all_merged <- used_market_df_all %>% merge(df_wide %>% select(-use_ghg, -production_ghg), by = "scenarios")
+
+used_market_df_all_merged %>%   group_by(production_ghg_cost_kwh) %>%
+  summarise(use_ghg = sum(use_ghg, na.rm = TRUE))
+
+used_market_df_all_merged %>%   group_by(electricity_ghg_kwh) %>%
+  summarise(use_ghg = sum(use_ghg, na.rm = TRUE))
+
+used_market_df_all_merged %>%   group_by(gas_ghg_gallon) %>%
+  summarise(use_ghg = sum(use_ghg, na.rm = TRUE))
+
+used_market_df_all_merged %>%   group_by(veh_mpg) %>%
+  summarise(use_ghg = sum(use_ghg, na.rm = TRUE))
+
+# this one here is puzzling
+used_market_df_all_merged %>%   group_by(veh_mpge, veh_mpg) %>%
+  summarise(use_ghg = sum(use_ghg, na.rm = TRUE))
+
+
+```
+
+```{r}
+df <- df_wide
+df$use_ghg <- df$use_ghg/10^9
+df$disposal_ghg <- df$disposal_ghg/10^9
+df$production_ghg <- df$production_ghg/10^9
+
+df$total_ghg <- df$use_ghg #+ df$disposal_ghg + df$production_ghg
+df$total_ghg <- df$total_ghg
+
+
+df$charging <- as.numeric(df$charging)
+df$veh_battery_size <- as.numeric(df$veh_battery_size)
+
+
+df$electricity_ghg_kwh[df$electricity_ghg_kwh == "p"] <- "p1" 
+df$gas_ghg_gallon[df$gas_ghg_gallon == "p"] <- "p2" 
+df$production_ghg_cost_kwh[df$production_ghg_cost_kwh == "p"] <- "p3" 
+df$veh_mpg[df$veh_mpg == "p"] <- "p4" 
+df$veh_mpge[df$veh_mpge == "p"] <- "p5" 
+
+
+#df %>% dplyr::filter(gas_ghg_gallon == "d", electricity_ghg_kwh == "d", production_ghg_cost_kwh == "d", veh_mpg == "d", veh_mpge == "d")  %>%
+df %>% 
+  ggplot(aes(x = veh_battery_size, y = total_ghg, group = charging, color = charging)) +
+    geom_line() +
+    ylab("GHG Mt") +
+    xlab("Battery Size kWh") + 
+    facet_wrap(electricity_ghg_kwh ~ gas_ghg_gallon + production_ghg_cost_kwh + veh_mpg + veh_mpge, labeller = label_wrap_gen(multi_line=FALSE))
+
+
+```

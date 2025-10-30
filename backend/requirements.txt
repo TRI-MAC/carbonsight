@@ -1,0 +1,17 @@
+streamlit
+loguru
+watchdog
+networkx
+pyvis
+pandera
+streamlit-bokeh3-events
+bokeh
+pint
+pint-pandas
+pydot
+graphviz
+neato
+scikit-learn
+streamlit_vertical_slider
+streamlit_toggle
+streamlit-authenticator

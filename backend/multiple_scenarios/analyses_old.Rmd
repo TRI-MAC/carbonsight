@@ -1,0 +1,110 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+
+```{r}
+df <- read.csv("~/repos/tri_mac/counterfactual_calculator/backend/multiple_scenarios/outputs/Total GHG_out.csv")
+head(df)
+table(df$scenario)
+df <- df %>% filter(scenario != "Nominal Default")
+df[c('var1', 'var2')] <- str_split_fixed(df$scenario, ';', 2)
+df[c('var1_name', 'var1_value')] <- str_split_fixed(df$var1, ':', 2)
+df[c('var2_name', 'var2_value')] <- str_split_fixed(df$var2, ':', 2)
+df$var1_value <- df$var1_value %>% as.numeric()
+df$var2_value <- df$var2_value %>% as.numeric()
+df_grouped <- df %>% group_by(var1_value, var2_value) %>% 
+  summarise(value = sum(value, na.rm = TRUE))
+
+df_casted <- df_grouped %>% select(value, var1_value, var2_value) %>% dcast(var1_value~var2_value)
+
+m1 <- df_casted %>% select(-var1_value) %>% as.matrix()
+colnames(m1)
+rownames(m1) <- df_casted$var1_value
+
+ggplot(df_grouped, aes(x = var1_value, y = var2_value, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value/10^13, 3))) +
+  scale_fill_gradient(low = "white", high = "red") +
+  xlab(unique(df$var1_name)) +
+  ylab(unique(df$var2_name))
+
+df$var1_name %>% table
+
+```
+```{r}
+df1 <- read.csv("~/repos/tri_mac/counterfactual_calculator/backend/multiple_scenarios/outputs/current_veh_t1_used_market_out.csv") %>% 
+  filter(scenario != "Nominal Default", powertrain == "phev")
+df2 <- read.csv("~/repos/tri_mac/counterfactual_calculator/backend/multiple_scenarios/outputs/disposed_veh_t1_out.csv")  %>% 
+  filter(scenario != "Nominal Default", powertrain == "phev")
+
+df <- df1 %>% group_by(year, scenario) %>% summarise(n = sum(n)) %>% filter(scenario == df1$scenario[nrow(df1)])
+plot(df$n, xlab="years", ylab="PHEVs count")
+
+
+head(df2)
+df1_grouped <- df1 %>% group_by(scenario) %>% summarise(use_ghg = sum(use_ghg, na.rm = TRUE),  production_ghg = sum(production_ghg, na.rm = TRUE))
+df2_grouped <- df2 %>% group_by(scenario) %>% summarise(disposal_ghg = sum(ghg_cost_x_n, na.rm = TRUE))
+df_merged <- df1_grouped %>% merge(df2_grouped, by = "scenario") 
+df_merged$value <- df_merged$production_ghg + df_merged$disposal_ghg + df_merged$use_ghg
+
+df <- df_merged %>% select(value, scenario)
+
+df[c('var1', 'var2')] <- str_split_fixed(df$scenario, ';', 2)
+df[c('var1_name', 'var1_value')] <- str_split_fixed(df$var1, ':', 2)
+df[c('var2_name', 'var2_value')] <- str_split_fixed(df$var2, ':', 2)
+df$var1_value <- df$var1_value %>% as.numeric()
+df$var2_value <- df$var2_value %>% as.numeric()
+df_grouped <- df %>% group_by(var1_value, var2_value) %>% 
+  summarise(value = sum(value, na.rm = TRUE))
+
+df_casted <- df_grouped %>% select(value, var1_value, var2_value) %>% dcast(var1_value~var2_value)
+
+m1 <- df_casted %>% select(-var1_value) %>% as.matrix()
+colnames(m1)
+rownames(m1) <- df_casted$var1_value
+
+ggplot(df_grouped, aes(x = var1_value, y = var2_value, fill = value)) +
+  geom_tile() +
+  geom_text(aes(label = round(value/10^9, 1))) +
+  scale_fill_gradient(low = "white", high = "red") +
+  xlab(unique(df$var1_name)) +
+  ylab(unique(df$var2_name))
+
+
+df_grouped <- df_grouped %>% rename(charging = "var2_value")
+df_grouped$charging <- df_grouped$charging %>% as.factor()
+
+ggplot(df_grouped, aes(x = var1_value, y = value, group = charging, color = charging)) +
+  geom_line() +
+  ylab("GHG kgs") +
+  xlab("Battery Size kWh")
+
+df$var1_name %>% table
+
+```
+
+
+
+```{r}
+df <- read.csv("~/repos/tri_mac/counterfactual_calculator/ekiden/multiple_scenarios/outputs/current_veh_t1_use_out.csv")
+df <- df %>% filter(scenario != "Nominal Default")
+x <- df %>% filter(powertrain == "phev") %>% group_by(production_year, scenario) %>% 
+  summarise(uf_real = mean(uf_real, na.rm = TRUE),
+            uf_from_range = mean(uf_from_range, na.rm = TRUE))
+#3View(x)
+
+df[c('var1', 'var2')] <- str_split_fixed(df$scenario, ';', 2)
+df[c('var1_name', 'var1_value')] <- str_split_fixed(df$var1, ':', 2)
+df[c('var2_name', 'var2_value')] <- str_split_fixed(df$var2, ':', 2)
+df$var1_value <- df$var1_value %>% as.numeric()
+df$var2_value <- df$var2_value %>% as.numeric()
+
+x <- df %>% filter(powertrain == "phev", production_year == 2027, vmt_bucket == "high", var2_value == 100, year == 2) %>% select(uf_from_range, scenario, ev_range, batt_kwh, production_ghg, use_ghg, year)
+#View(x)
+
+plot(x$use_ghg, x$production_ghg)
+
+```

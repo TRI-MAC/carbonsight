@@ -1,0 +1,4 @@
+"veh_battery_size_phev:0.0;cont_disposal_rate:0.0": {"veh_battery_size": pd.DataFrame({"powertrain": [1,2,3,4], "batt_kwh": [None, 2, 0.0, 85.8]}), "cont_disposal_rate": 0.0},
+"veh_battery_size_phev:0.0;cont_disposal_rate:0.5": {"veh_battery_size": pd.DataFrame({"powertrain": [1,2,3,4], "batt_kwh": [None, 2, 0.0, 85.8]}), "cont_disposal_rate": 0.5},
+"veh_battery_size_phev:0.5;cont_disposal_rate:0.0": {"veh_battery_size": pd.DataFrame({"powertrain": [1,2,3,4], "batt_kwh": [None, 2, 0.5, 85.8]}), "cont_disposal_rate": 0.0},
+"veh_battery_size_phev:0.5;cont_disposal_rate:0.5": {"veh_battery_size": pd.DataFrame({"powertrain": [1,2,3,4], "batt_kwh": [None, 2, 0.5, 85.8]}), "cont_disposal_rate": 0.5},

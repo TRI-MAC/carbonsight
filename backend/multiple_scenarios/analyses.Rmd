@@ -1,0 +1,458 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(stringr)
+library(reshape2)
+library(ggpubr)
+
+```
+
+
+
+```{r}
+# read folders and variables
+main_folder_path <- "~/Desktop/default_progress"
+
+
+system_folders <- system(paste0("ls ", main_folder_path ), intern = TRUE)
+
+df_wide <- data.frame(scenarios = system_folders)
+df_wide["scenarios"] %>% stringr::str_split(";") %>% stringr::str_split("=")  %>% unique()
+
+
+var_names_with_levels <- c()
+var_names <- c()
+
+for (scenario in df_wide["scenarios"]){
+  var_names_with_levels  <- c(var_names_with_levels,scenario %>% stringr::str_split(";") %>% unlist()) %>% unique()
+  var_names  <- c(var_names,scenario %>% stringr::str_split(";") %>% unlist() 
+                              %>% stringr::str_split("=") %>% unlist()) %>% unique()
+}
+
+level_names <- c("d", "p") #c("default", "progress")
+var_names <- setdiff(var_names, level_names)
+var_names_human <- c("eco-driving", "PHEV charging", "VMT", "used_market", "GHG_engine", "GHG_body",
+                     "GHG_battery", "MPG","MPGe", "electrification", "GHG_electricity", "GHG_gas" ) 
+df_var_names <- data.frame("var_names" = var_names, 
+                           "var_type" = c("beh","beh","beh","beh","tech","tech","tech","tech","tech","tech","tech","tech" ))
+
+recode_values <- function(input_vec, old, new){
+  output_vec <- unname(setNames(new, old)[input_vec])
+  output_vec[is.na(output_vec)] <- input_vec[is.na(output_vec)]
+  output_vec <- output_vec %>% unname %>% unlist
+}
+
+
+
+
+for (var_name in var_names){
+  df_wide[var_name] <- NA
+  for (level_name in level_names){
+    df_wide[ stringr::str_detect(df_wide$scenarios, paste0(var_name, "=",level_name)),var_name] <- level_name
+  }
+}
+
+##### df_wide with years
+df_wide_years <- df_wide
+df_wide_years$year <- 0
+for (i in 1:9){
+  step_df <- df_wide_years %>% filter(year == 0)
+  step_df$year <- i
+  df_wide_years <- rbind(df_wide_years, step_df)
+}
+
+###### df_wide computing number of progress interventions
+
+
+df_wide_type_sums <- df_wide
+df_wide_type_sums[df_wide_type_sums == "p"] <- 1
+df_wide_type_sums[df_wide_type_sums == "d"] <- 0
+df_wide_type_sums[var_names] <- df_wide_type_sums[var_names] %>% apply(., 2, as.numeric)
+
+beh_cols <- df_var_names %>% filter(var_type == "beh") %>% select(var_names)  %>% unname() %>% unlist()
+df_wide_type_sums$beh_sum <- df_wide_type_sums[, colnames(df_wide_type_sums) %in% beh_cols] %>% rowSums(na.rm = TRUE)
+
+tech_cols <- df_var_names %>% filter(var_type == "tech") %>% select(var_names)  %>% unname() %>% unlist()
+df_wide_type_sums$tech_sum <- df_wide_type_sums[, colnames(df_wide_type_sums) %in% tech_cols] %>% rowSums(na.rm = TRUE)
+df_wide_type_sums$tech_and_beh_sum <- df_wide_type_sums[, colnames(df_wide_type_sums) %in% var_names] %>% rowSums(na.rm = TRUE)
+
+
+
+df_wide_type_sums <- df_wide_type_sums %>% select(scenarios, beh_sum, tech_sum, tech_and_beh_sum)
+
+#### read scenarios
+
+df_wide$x_var <- NA
+for (scenario in df_wide$scenarios){
+  file_df <- read.csv(paste0(main_folder_path,"/",scenario, "/Total GHG_out.csv")) 
+
+  file_df <- file_df  %>% filter(scenario != "default")
+  file_df$senarios <- scenario
+  x_var <- sum(file_df$value, na.rm = TRUE)
+  df_wide[df_wide$scenarios == scenario, "x_var"] <- x_var
+}
+df_wide <- df_wide[complete.cases(df_wide),]
+if (nrow(df_wide) != (2^length(var_names))){
+  stop("The number of rows read from the input files is unexpected!")
+}
+
+
+
+file_df_all <- data.frame()
+for (scenario in unique(df_wide_years$scenarios)){
+  file_df <- read.csv(paste0(main_folder_path,"/",scenario, "/Total GHG_out.csv")) %>% filter(scenario != "default")
+  file_df$scenario <- scenario
+  file_df$cumsum_value <- cumsum(file_df$value)
+  file_df <- file_df %>% rename(x_var = "value", scenarios = "scenario") %>%
+    select(scenarios, x_var, year)
+  file_df_all <- dplyr::bind_rows(file_df, file_df_all)
+}
+	
+df_wide_years <- df_wide_years  %>% merge(file_df_all, by = c("scenarios", "year"), all.x = TRUE, all.y = FALSE)
+df_wide_years <- df_wide_years[complete.cases(df_wide_years),]
+if (nrow(df_wide_years) != length(unique(df_wide_years$year))*(2^length(var_names))){
+  stop("The number of rows and years read from the input files is unexpected!")
+}
+
+# %>% select(-x_var)
+
+### create long files
+# no years
+df_long <- melt(df_wide, id.vars = c("scenarios")) %>% filter(variable != "x_var")
+df_long <- df_long %>% merge(df_wide, by = "scenarios")
+df_very_long <- melt(df_long, id.vars = c("scenarios"), measure.vars = var_names) %>%
+  rename(var_name = "variable", label_name = "value")
+df_very_long <- df_very_long %>% merge(df_wide, by = "scenarios") 
+  #%>% merge(df_long %>% select(-variable, -value, -x_var), by = "scenarios")
+df_very_long <- df_very_long %>% filter(!is.na(label_name))
+df_very_long$x_var %>% hist()
+df_very_long$progress <- NA
+df_very_long$progress[df_very_long$label_name == "p"] <- 1
+df_very_long$progress[df_very_long$label_name == "d"] <- 0
+
+# with years 
+df_long_years <- melt(df_wide_years, id.vars = c("scenarios", "year")) %>% filter(variable != "x_var")
+
+df_long_years <- df_long_years %>% merge(df_wide_years, by =  c("scenarios", "year"))
+df_very_long_years <- melt(df_long_years, id.vars = c("scenarios", "year"), measure.vars = var_names) %>%
+  rename(var_name = "variable", label_name = "value")
+
+df_very_long_years <- df_very_long_years %>% filter(!is.na(label_name))
+
+df_very_long_years <- df_very_long_years %>% merge(df_wide_years, by = c("scenarios", "year")) 
+
+#df_very_long_years$x_var %>% hist()
+df_very_long_years$progress <- NA
+df_very_long_years$progress[df_very_long_years$label_name == "p"] <- 1
+df_very_long_years$progress[df_very_long_years$label_name == "d"] <- 0
+df_very_long_years <- df_very_long_years %>% merge(df_wide_type_sums, on = "scenarios")
+
+print(1:5)
+```
+
+
+```{r}
+# savings compared to default
+
+
+# overall progress 
+buff_df <- df_very_long %>% group_by(scenarios) %>%
+  summarise(progress_count = sum(progress, na.rm = TRUE),
+            x_var = mean(x_var, na.rm = TRUE)) %>%
+  group_by(progress_count) %>% 
+  summarise(x_var = mean(x_var, na.rm = TRUE))
+base_line = buff_df[buff_df$progress_count == 0, "x_var"] %>% unname() %>% unlist()
+full_interv = buff_df[buff_df$progress_count == 144, "x_var"] %>% unname() %>% unlist()
+(base_line - full_interv)/base_line # 0.1642742
+
+
+# progress by variable
+gg_df <- df_very_long %>% 
+  mutate(GHG_saved = base_line - x_var) %>%
+  group_by(var_name, label_name) %>%
+  summarise(GHG_saved_stdev = sd(GHG_saved),
+            GHG_saved = mean(GHG_saved, na.rm = TRUE),
+            n = n()) 
+gg_df$var_name <- recode_values(gg_df$var_name, var_names, var_names_human) 
+gg_df$var_name <- gg_df$var_name %>% factor(levels = var_names_human)
+
+gg_df$label_name <- gg_df$label_name %>% recode(p = "progress", d = "default")
+gg_df$GHG_saved <- gg_df$GHG_saved/10^9
+
+
+ghg_saved_by_var <- gg_df %>% ggplot(aes(y = GHG_saved, x= var_name, fill = label_name)) +
+  geom_bar(stat = "identity", position = "dodge", alpha = .5, width=.7) +
+  scale_fill_manual(name = "Intervention State", values = c("red", "blue")) +
+  theme_classic() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  xlab("Interventions") +
+  ylab("Saved GHG Cumulative (Mt)") +
+  #geom_errorbar( aes(x= var_name, ymin=GHG_saved-GHG_saved_stdev, ymax=GHG_saved+GHG_saved_stdev), 
+  #               position =  position_dodge(width = 0.9) , width = 0.3, color = "black") 
+  geom_vline(xintercept = 4.5)
+plot(ghg_saved_by_var)
+
+
+
+# add progress vs default a single value graph
+
+```
+
+```{r}
+# look at trends over the years ?
+df_wide_years_cum <- df_wide_years %>% arrange(scenarios, year) %>%
+  group_by(scenarios) %>%
+  mutate(x_var_cum = cumsum(x_var)) %>%
+  ungroup()
+
+
+# overall progress
+buff_df <- df_very_long_years %>% 
+  merge(df_wide_years_cum %>% select(scenarios, year, x_var_cum), on = c("scenarios", "year")) %>%
+  group_by(scenarios, year) %>%
+  summarise( x_var_cum = mean(x_var_cum, na.rm = TRUE),
+             x_var = mean(x_var, na.rm = TRUE),
+             progress_mean = mean(progress),
+             beh_progress_mean = mean(beh_sum)/4, 
+             tech_progress_mean = mean(tech_sum)/8) # progress tech_sum beh_sum
+
+buff_df[c("progress_mean", "beh_progress_mean", "tech_progress_mean")] <- buff_df[c("progress_mean", "beh_progress_mean", "tech_progress_mean")]*100
+
+
+buff_df$x_var_cum <- buff_df$x_var_cum/10^9
+buff_df$x_var <- buff_df$x_var/10^9
+
+# compute changes (for the paper)
+t0d <- buff_df$x_var[buff_df$year == 0 & buff_df$progress_mean == 0 ]
+t9d <- buff_df$x_var[buff_df$year == 9 & buff_df$progress_mean == 0 ]
+t9p <- buff_df$x_var[buff_df$year == 9 & buff_df$progress_mean == 100 ]
+(t0d - t9d)/t0d #%16 reduction
+(t0d - t9p)/t0d #%40% reduction
+
+
+cumulative_ghg_by_overall_progress <- buff_df %>% ggplot(aes(y=x_var_cum, x = year, group = scenarios, color = progress_mean))+ 
+  geom_line(alpha=0.4, linewidth=.3, show.legend = TRUE) +
+  #scale_colour_gradientn(name = "% interventions \n implemented", colours=c("red","blue")) +
+  scale_colour_gradientn(name = "% interventions \n implemented", colours=c("red","blue"), guide = "none") +
+  theme_classic() +
+  scale_x_continuous(breaks=seq(0,9, n = 9)) +
+  ylim(0, 12000) +
+  xlab("Years") +
+  ylab("GHG Cumulative (Mt)")
+  #facet_grid("new_powertrain_prop")
+plot(cumulative_ghg_by_overall_progress)
+#ggsave("~/Downloads/cumsum_total.png", device = "png", width = 4, height = 3)
+
+
+ghg_by_overall_progress <- buff_df %>% ggplot(aes(y=x_var, x = year, group = scenarios, color = progress_mean))+ 
+  geom_line(alpha=0.4, linewidth=.3, show.legend = TRUE) +
+  #scale_colour_gradientn(name = "% interventions \n implemented", colours=c("red","blue")) +
+  scale_colour_gradientn(name = "% interventions \n implemented", colours=c("red","blue"), guide = "none") +
+  theme_classic() +
+  scale_x_continuous(breaks=seq(0,9, n = 9)) +
+  ylim(0, 1400) +
+  xlab("Years") +
+  ylab("GHG per Year (Mt)")
+  #facet_grid("new_powertrain_prop")
+plot(ghg_by_overall_progress)
+
+cumsum_figure <- 
+  ggarrange(
+    
+    ggarrange( ghg_by_overall_progress, cumulative_ghg_by_overall_progress, ncol = 2, nrow = 1, labels = c("A", "B")), 
+    ghg_saved_by_var, ncol = 1, nrow = 2, labels = c("", "C")
+  )
+
+
+  
+plot(cumsum_figure)
+ggsave("~/Downloads/cumsum_figure.png", device = "png", width = 8, height = 8)
+
+```
+
+
+```{r}
+#effectiveness of interventions over time and as a function of other interventions
+
+s_to_s_df <- data.frame() #scenario to scenario
+for (var_x in var_names){
+  
+  buff_df <- df_wide
+  print(var_x)
+  short_var_list <- setdiff(var_names, var_x)
+  buff_df$short_var_list_string_code <- buff_df[,short_var_list] %>% apply(., 1, function(x)paste0(x, collapse =""))
+  
+  buff_df_p <- buff_df[buff_df[,var_x] == "p",] %>% 
+    rename(scenarios_p = scenarios, x_var_p = x_var) %>% 
+    select(short_var_list_string_code, scenarios_p, x_var_p)
+  buff_df_d <- buff_df[buff_df[,var_x] == "d",] %>% 
+    rename(scenarios_d = scenarios, x_var_d = x_var) 
+  buff_df_d <- buff_df_d[, c("short_var_list_string_code","scenarios_d","x_var_d", var_names)]
+  buff_df_merged <- merge(buff_df_p, buff_df_d, by = "short_var_list_string_code")
+  buff_df_merged$var_name <- var_x
+  s_to_s_df <- bind_rows(s_to_s_df,buff_df_merged )
+}
+s_to_s_df$progress_count <- str_count(s_to_s_df$short_var_list_string_code, "p")
+s_to_s_df$progress_perc <- (s_to_s_df$progress_count/max(s_to_s_df$progress_count))*100
+
+outer_df <- data.frame()
+for (i in 0:9){
+  buff_df <- s_to_s_df %>% mutate(year = i)
+  outer_df <- bind_rows(outer_df, buff_df)
+}
+s_to_s_years_df <- outer_df
+s_to_s_years_df <- s_to_s_years_df %>%
+  merge(
+    df_wide_years %>% select(scenarios, year, x_var) %>% rename(scenarios_p = scenarios),
+    by = c("scenarios_p", "year"),
+    all.x = TRUE,
+    all.y = FALSE
+  ) %>% select(-x_var_p) %>% rename(x_var_p = x_var)
+
+s_to_s_years_df <- s_to_s_years_df %>%
+  merge(
+    df_wide_years %>% select(scenarios, year, x_var) %>% rename(scenarios_d = scenarios),
+    by = c("scenarios_d", "year"),
+    all.x = TRUE,
+    all.y = FALSE
+  ) %>% select(-x_var_d) %>% rename(x_var_d = x_var)
+
+# 245760
+dim(s_to_s_years_df)
+
+s_to_s_years_df$change <- s_to_s_years_df$x_var_d - s_to_s_years_df$x_var_p
+
+
+s_to_s_years_df$var_name <- recode_values(s_to_s_years_df$var_name, var_names, var_names_human)
+s_to_s_years_df$var_name_f <- s_to_s_years_df$var_name %>% factor(levels = var_names_human)
+s_to_s_years_df$change <- s_to_s_years_df$change/10^9
+
+
+var_by_scenario <- s_to_s_years_df %>% ggplot(aes(y=change, x = year, group = short_var_list_string_code, color = progress_perc)) +
+  geom_line(alpha=.6, linewidth=.3, show.legend = TRUE) + 
+  scale_colour_gradientn(name = "% interv. \n implemented", colors = c("red", "blue")) +
+  scale_x_continuous(breaks=seq(0,9)) +
+  theme_classic() +
+  xlab("Year") +
+  ylab("Saved GHG Per Year (Mt)") +
+  facet_wrap(~var_name_f)
+  #facet_wrap(~factor(var_name, levels = c(levels(gg_df$var_name))))
+plot(var_by_scenario)
+
+ggsave("~/Downloads/var_by_scenario.png", device = "png", width = 7, height = 7)
+
+
+#### grid var by var  
+
+#s_to_s_years_df$year = -1
+outer_df <- data.frame()
+for (var_name_x in var_names){
+  buff_df <- s_to_s_years_df
+  buff_df$conditional_var <- var_name_x
+  buff_df$conditional_var_state <- buff_df[,var_name_x]
+  buff_df <- buff_df %>% select(var_name,conditional_var, conditional_var_state, change, year) 
+  outer_df <- bind_rows(outer_df, buff_df)
+}
+
+v_by_v_df <- outer_df
+
+gg_df <- v_by_v_df %>% group_by(var_name, conditional_var, conditional_var_state, year) %>%
+  summarise(change = mean(change))
+
+
+
+
+gg_df$var_name <- recode_values(gg_df$var_name, var_names, var_names_human)
+gg_df$var_name_f <- gg_df$var_name %>% factor(levels = var_names_human)
+
+gg_df$conditional_var <- recode_values(gg_df$conditional_var, var_names, var_names_human)
+gg_df$conditional_var_f <- gg_df$conditional_var %>% factor(levels = var_names_human)
+
+gg_df[gg_df$var_name == gg_df$conditional_var, "change"] <- NA
+
+gg_df$conditional_var_state <- gg_df$conditional_var_state %>% recode("p" = "progress", "d" = "default")
+
+
+var_by_var <- gg_df %>% ggplot(aes(y=change, x = year, group = conditional_var_state, color = conditional_var_state)) +
+  geom_line(alpha=.6, linewidth=.6, show.legend = TRUE) + 
+  scale_x_continuous(breaks=seq(0,9, n = 9)) +
+  theme_classic() +
+    theme(strip.text = element_text(size = 5),
+        axis.ticks.x=element_blank(),
+        axis.text.x=element_blank(),
+        legend.text=element_text(size=7),
+        legend.title=element_text(size=8)) +
+  xlab("Years (0-9)") +
+  ylab("Saved GHG Per Year (Mt)") +
+  scale_colour_manual(name = "column var. \n state", values = c("red", "blue")) +
+  facet_grid(var_name_f ~ conditional_var_f)
+
+plot(var_by_var)
+ggsave("~/Downloads/var_by_var.png", device = "png", width = 8, height = 8)
+
+
+```
+
+```{r}
+# percent contribution each variable
+
+buff_df0 <- df_very_long_years %>% group_by(year, scenarios) %>%
+  summarise(progress = mean(progress), 
+            x_var = mean(x_var)) %>%
+  filter(progress %in% c(0,1)) %>%
+  dcast(year~progress, value.var = "x_var")
+buff_df0$change <-  buff_df0$`0` - buff_df0$`1`
+plot(buff_df0$change)
+
+buff_df <- s_to_s_years_df %>% group_by(var_name, year) %>%
+  summarise(change = mean(change, na.rm = TRUE))
+
+
+buff_df$var_type <- ifelse(buff_df$var_name %in% var_names_human[1:4], "behav.", "tech")
+buff_df$var_type <- buff_df$var_type %>% factor(levels = c("behav.", "tech"))
+
+buff_df$var_name <- recode_values(buff_df$var_name, var_names, var_names_human) 
+buff_df$var_name <- buff_df$var_name %>% factor(levels = var_names_human)
+
+
+
+buff_df_x <- buff_df %>% 
+      filter(year == 9) %>% 
+      rename(change_10 = change) %>%
+      group_by(var_name) %>%
+        summarise(change_10 = mean(change_10)) %>%
+      ungroup() %>%
+      arrange(desc(var_name)) %>%
+      mutate(change_10_cum = cumsum(change_10)) %>%
+      select(change_10,change_10_cum, var_name)
+
+
+buff_df <- buff_df %>% merge(buff_df_x, by = c("var_name"))
+buff_df <- buff_df %>% arrange(var_name)
+
+# adjust text height to avoid overlap
+buff_df$change_10_cum[buff_df$var_name == "GHG_engine"] = buff_df$change_10_cum[buff_df$var_name == "GHG_engine"]*1.01
+buff_df$change_10_cum[buff_df$var_name == "GHG_body"] = buff_df$change_10_cum[buff_df$var_name == "GHG_body"]*0.99
+
+
+stacked_ates <- buff_df %>% ggplot(aes(x = year, y = change, group = var_name, fill = var_type)) +
+  geom_area(color = "black", size=.2, alpha=.5) +
+  theme_classic() +
+  geom_text(aes(x=9.1, y=change_10_cum, label=var_name), size = 2,  hjust = 0) + 
+  xlim(0, 10.9) +
+  theme(legend.position="none") +
+  xlab("Year") +
+  ylab("Saved GHG Per Year (Mt)") 
+  #geom_line(data=buff_df0, aes(x=year, y=change), linetype="dashed", color='black')
+plot(stacked_ates)
+ggsave("~/Downloads/stacked_ates.png", device = "png", width = 5, height = 5)
+
+
+```
+

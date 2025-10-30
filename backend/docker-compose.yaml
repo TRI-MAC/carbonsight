@@ -1,0 +1,23 @@
+version: '3'
+services:
+  backend:
+    build:
+      context: .
+      target: backend
+    # Here we can inject one or more environment files
+    env_file:
+      - ../config/.env.local.backend.env
+      - ../config/.env.local.backend.secrets.env
+      - ../config/.env.local.services.env
+      - ../config/.env.local.aws_services.env
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: curl -f http://localhost:8000/api/health || exit 1
+      interval: 20s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    environment:
+      AWS_DEFAULT_REGION: "us-east-1"
+      AWS_CONTAINER_CREDENTIALS_RELATIVE_URI: "/creds"

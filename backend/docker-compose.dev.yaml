@@ -1,0 +1,9 @@
+version: '3'
+services:
+  backend:
+    extends:
+      file: docker-compose.yaml
+      service: backend
+    command: fastapi run app/main.py --port 8000
+    volumes:
+      - ./app:/app/app
