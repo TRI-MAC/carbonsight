@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "carbonsight"
+version = "0.1.0"
+description = "Counterfactual carbon impact simulator for automotive fleet decarbonization"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "networkx>=3.2",
+    "pydantic>=2.5",
+    "pandera>=0.18",
+    "scipy>=1.12",
+    "scikit-learn>=1.4",
+    "SALib>=1.4",
+    "fastapi>=0.109",
+    "uvicorn>=0.27",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.1",
+    "ruff>=0.2",
+    "httpx>=0.27",
+]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "W"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
