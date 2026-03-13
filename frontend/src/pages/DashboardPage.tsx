@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AreaChart,
   Area,
@@ -13,23 +14,23 @@ import { api } from "../api/client";
 import Card from "../components/Card";
 import Button from "../components/Button";
 
-interface DashboardMetrics {
-  fleetSize: number;
-  annualGHG: number;
-  bevShare: number;
-  simulationStatus: string;
+interface Metrics {
+  fleet_size: number;
+  annual_ghg: number;
+  bev_share: number;
+  bev_share_final: number;
+  total_vmt: number;
 }
 
 interface TrajectoryPoint {
   year: number;
   ghg: number;
-  p5: number;
-  p25: number;
-  p75: number;
-  p95: number;
+  production: number;
+  usage: number;
+  disposal: number;
 }
 
-interface FleetCompositionPoint {
+interface CompositionPoint {
   year: number;
   ICEV: number;
   HEV: number;
@@ -37,68 +38,65 @@ interface FleetCompositionPoint {
   BEV: number;
 }
 
-const DEMO_METRICS: DashboardMetrics = {
-  fleetSize: 285000000,
-  annualGHG: 1542.3,
-  bevShare: 12.8,
-  simulationStatus: "healthy",
-};
-
-const generateDemoTrajectory = (): TrajectoryPoint[] => {
-  const data: TrajectoryPoint[] = [];
-  for (let i = 0; i <= 10; i++) {
-    const year = 2024 + i;
-    const ghg = 1500 - i * 45;
-    data.push({
-      year,
-      ghg,
-      p5: ghg - 80,
-      p25: ghg - 40,
-      p75: ghg + 40,
-      p95: ghg + 80,
-    });
-  }
-  return data;
-};
-
-const generateDemoFleetComposition = (): FleetCompositionPoint[] => {
-  const data: FleetCompositionPoint[] = [];
-  for (let i = 0; i <= 10; i++) {
-    const year = 2024 + i;
-    const bevGrowth = i * 3.5;
-    const phevGrowth = i * 2.2;
-    const hevGrowth = i * 1.8;
-    data.push({
-      year,
-      BEV: 8 + bevGrowth,
-      PHEV: 4 + phevGrowth,
-      HEV: 12 + hevGrowth,
-      ICEV: 76 - bevGrowth - phevGrowth - hevGrowth,
-    });
-  }
-  return data;
-};
-
 export default function DashboardPage() {
-  const [metrics] = useState<DashboardMetrics>(DEMO_METRICS);
-  const [trajectoryData] = useState<TrajectoryPoint[]>(
-    generateDemoTrajectory(),
-  );
-  const [fleetComposition] = useState<FleetCompositionPoint[]>(
-    generateDemoFleetComposition(),
-  );
+  const navigate = useNavigate();
+  const [metrics, setMetrics] = useState<Metrics | null>(null);
+  const [trajectory, setTrajectory] = useState<TrajectoryPoint[]>([]);
+  const [composition, setComposition] = useState<CompositionPoint[]>([]);
   const [apiHealthy, setApiHealthy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [simTime, setSimTime] = useState<number | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     api
-      .health()
-      .then((h) => setApiHealthy(h.status === "ok"))
-      .catch(() => setApiHealthy(false));
+      .getDashboard()
+      .then((data) => {
+        setMetrics(data.metrics);
+        setTrajectory(data.trajectory);
+        setComposition(data.composition);
+        setSimTime(data.wall_clock_seconds);
+        setApiHealthy(true);
+      })
+      .catch(() => {
+        setApiHealthy(false);
+        // Demo fallback
+        setMetrics({
+          fleet_size: 285000000,
+          annual_ghg: 1176,
+          bev_share: 1.9,
+          bev_share_final: 1.9,
+          total_vmt: 2.85e12,
+        });
+        const demoTraj: TrajectoryPoint[] = [];
+        const demoComp: CompositionPoint[] = [];
+        for (let i = 0; i < 10; i++) {
+          demoTraj.push({
+            year: 2024 + i,
+            ghg: 1176 - i * 2,
+            production: 73,
+            usage: 1062 - i * 2,
+            disposal: 41,
+          });
+          demoComp.push({
+            year: 2024 + i,
+            ICEV: 94 - i * 0.5,
+            HEV: 3.4,
+            PHEV: 0.6,
+            BEV: 1.9 + i * 0.5,
+          });
+        }
+        setTrajectory(demoTraj);
+        setComposition(demoComp);
+      })
+      .finally(() => setLoading(false));
   }, []);
 
-  const formatNumber = (num: number): string => {
-    if (num >= 1_000_000) return `${(num / 1_000_000).toFixed(1)}M`;
-    if (num >= 1_000) return `${(num / 1_000).toFixed(1)}K`;
+  const fmt = (num: number): string => {
+    if (num >= 1e12) return `${(num / 1e12).toFixed(2)}T`;
+    if (num >= 1e9) return `${(num / 1e9).toFixed(1)}B`;
+    if (num >= 1e6) return `${(num / 1e6).toFixed(1)}M`;
+    if (num >= 1e3) return `${(num / 1e3).toFixed(1)}K`;
     return num.toFixed(0);
   };
 
@@ -111,6 +109,7 @@ export default function DashboardPage() {
 
   return (
     <div style={{ padding: 32, minHeight: "100vh" }}>
+      {/* Header */}
       <div
         style={{
           display: "flex",
@@ -153,44 +152,34 @@ export default function DashboardPage() {
               color: "var(--text-secondary)",
             }}
           >
-            {apiHealthy ? "API Connected" : "Demo Mode"}
+            {loading ? "Loading..." : apiHealthy ? "Live Data" : "Demo Mode"}
           </span>
+          {simTime !== null && (
+            <span
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: 11,
+                color: "var(--text-muted)",
+                marginLeft: 8,
+              }}
+            >
+              sim: {simTime.toFixed(2)}s
+            </span>
+          )}
         </div>
       </div>
 
       {/* Metric Cards */}
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          gap: 20,
-          marginBottom: 24,
-        }}
-      >
-        {[
-          {
-            label: "Total Fleet Size",
-            value: formatNumber(metrics.fleetSize),
-            sub: "vehicles",
-          },
-          {
-            label: "Annual GHG",
-            value: metrics.annualGHG.toFixed(1),
-            sub: "Mt CO2e",
-          },
-          {
-            label: "BEV Share",
-            value: `${metrics.bevShare.toFixed(1)}%`,
-            sub: "of total fleet",
-          },
-          {
-            label: "Status",
-            value: metrics.simulationStatus,
-            sub: "simulation engine",
-            color: "var(--accent-green)",
-          },
-        ].map((m) => (
-          <Card key={m.label}>
+      {metrics && (
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 20,
+            marginBottom: 24,
+          }}
+        >
+          <Card>
             <div
               style={{
                 fontSize: 11,
@@ -200,25 +189,103 @@ export default function DashboardPage() {
                 marginBottom: 10,
               }}
             >
-              {m.label}
+              Total Fleet Size
             </div>
             <div
               style={{
                 fontFamily: "var(--font-display)",
                 fontSize: 32,
                 fontWeight: 700,
-                color: m.color ?? "var(--text-primary)",
                 marginBottom: 4,
               }}
             >
-              {m.value}
+              {fmt(metrics.fleet_size)}
             </div>
             <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
-              {m.sub}
+              vehicles in simulation
             </div>
           </Card>
-        ))}
-      </div>
+          <Card>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: 10,
+              }}
+            >
+              Annual GHG (Year 1)
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 32,
+                fontWeight: 700,
+                marginBottom: 4,
+              }}
+            >
+              {metrics.annual_ghg.toFixed(1)}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              Mt CO2e (production + usage + disposal)
+            </div>
+          </Card>
+          <Card>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: 10,
+              }}
+            >
+              BEV Share
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 32,
+                fontWeight: 700,
+                color: "var(--accent-green)",
+                marginBottom: 4,
+              }}
+            >
+              {metrics.bev_share.toFixed(1)}%
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              of fleet &rarr; {metrics.bev_share_final.toFixed(1)}% by 2033
+            </div>
+          </Card>
+          <Card>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--text-muted)",
+                textTransform: "uppercase",
+                letterSpacing: "0.5px",
+                marginBottom: 10,
+              }}
+            >
+              Total VMT
+            </div>
+            <div
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: 32,
+                fontWeight: 700,
+                marginBottom: 4,
+              }}
+            >
+              {fmt(metrics.total_vmt)}
+            </div>
+            <div style={{ fontSize: 11, color: "var(--text-muted)" }}>
+              miles driven annually
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Charts */}
       <div
@@ -230,11 +297,11 @@ export default function DashboardPage() {
         }}
       >
         <Card
-          title="GHG Emissions Trajectory"
-          subtitle="10-year projection with confidence bands"
+          title="GHG Emissions by Component"
+          subtitle="10-year baseline trajectory (Mt CO2e)"
         >
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={trajectoryData}>
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={trajectory}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
               <XAxis
                 dataKey="year"
@@ -245,79 +312,24 @@ export default function DashboardPage() {
                 stroke="#556178"
                 style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
               />
-              <Tooltip contentStyle={tooltipStyle} />
-              <Area
-                type="monotone"
-                dataKey="p95"
-                stroke="none"
-                fill="#22d3ee"
-                fillOpacity={0.08}
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(v) => `${Number(v).toFixed(1)} Mt`}
               />
-              <Area
-                type="monotone"
-                dataKey="p75"
-                stroke="none"
-                fill="#22d3ee"
-                fillOpacity={0.15}
-              />
-              <Area
-                type="monotone"
-                dataKey="ghg"
-                stroke="#22d3ee"
-                strokeWidth={2}
-                fill="#22d3ee"
-                fillOpacity={0.05}
-              />
-              <Area
-                type="monotone"
-                dataKey="p25"
-                stroke="none"
-                fill="transparent"
-              />
-              <Area
-                type="monotone"
-                dataKey="p5"
-                stroke="none"
-                fill="transparent"
-              />
-            </AreaChart>
-          </ResponsiveContainer>
-        </Card>
-
-        <Card title="Fleet Composition" subtitle="Powertrain share evolution">
-          <ResponsiveContainer width="100%" height={280}>
-            <AreaChart data={fleetComposition}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
-              <XAxis
-                dataKey="year"
-                stroke="#556178"
-                style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
-              />
-              <YAxis
-                stroke="#556178"
-                style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
-              />
-              <Tooltip contentStyle={tooltipStyle} />
               <Legend wrapperStyle={{ fontSize: 12, color: "#8b95a8" }} />
               <Area
                 type="monotone"
-                dataKey="BEV"
+                dataKey="usage"
+                name="Usage"
                 stackId="1"
-                stroke="#34d399"
-                fill="#34d399"
+                stroke="#f87171"
+                fill="#f87171"
                 fillOpacity={0.6}
               />
               <Area
                 type="monotone"
-                dataKey="PHEV"
-                stackId="1"
-                stroke="#3b82f6"
-                fill="#3b82f6"
-                fillOpacity={0.6}
-              />
-              <Area
-                type="monotone"
-                dataKey="HEV"
+                dataKey="production"
+                name="Production"
                 stackId="1"
                 stroke="#fbbf24"
                 fill="#fbbf24"
@@ -325,23 +337,91 @@ export default function DashboardPage() {
               />
               <Area
                 type="monotone"
+                dataKey="disposal"
+                name="Disposal"
+                stackId="1"
+                stroke="#a78bfa"
+                fill="#a78bfa"
+                fillOpacity={0.6}
+              />
+            </AreaChart>
+          </ResponsiveContainer>
+        </Card>
+
+        <Card
+          title="Fleet Composition"
+          subtitle="Powertrain share evolution (%)"
+        >
+          <ResponsiveContainer width="100%" height={300}>
+            <AreaChart data={composition}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+              <XAxis
+                dataKey="year"
+                stroke="#556178"
+                style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
+              />
+              <YAxis
+                stroke="#556178"
+                style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
+                domain={[0, 100]}
+              />
+              <Tooltip
+                contentStyle={tooltipStyle}
+                formatter={(v) => `${Number(v).toFixed(1)}%`}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, color: "#8b95a8" }} />
+              <Area
+                type="monotone"
+                dataKey="BEV"
+                stackId="1"
+                stroke="#34d399"
+                fill="#34d399"
+                fillOpacity={0.7}
+              />
+              <Area
+                type="monotone"
+                dataKey="PHEV"
+                stackId="1"
+                stroke="#3b82f6"
+                fill="#3b82f6"
+                fillOpacity={0.7}
+              />
+              <Area
+                type="monotone"
+                dataKey="HEV"
+                stackId="1"
+                stroke="#fbbf24"
+                fill="#fbbf24"
+                fillOpacity={0.7}
+              />
+              <Area
+                type="monotone"
                 dataKey="ICEV"
                 stackId="1"
                 stroke="#f87171"
                 fill="#f87171"
-                fillOpacity={0.6}
+                fillOpacity={0.7}
               />
             </AreaChart>
           </ResponsiveContainer>
         </Card>
       </div>
 
+      {/* Quick Actions */}
       <Card title="Quick Actions">
         <div style={{ display: "flex", gap: 12 }}>
-          <Button variant="primary">Run Simulation</Button>
-          <Button>Compare Scenarios</Button>
-          <Button>Sensitivity Analysis</Button>
-          <Button>Export Report</Button>
+          <Button variant="primary" onClick={() => navigate("/scenarios")}>
+            Run Simulation
+          </Button>
+          <Button onClick={() => navigate("/compare")}>
+            Compare Scenarios
+          </Button>
+          <Button onClick={() => navigate("/sensitivity")}>
+            Sensitivity Analysis
+          </Button>
+          <Button onClick={() => navigate("/graph")}>
+            Explore Causal Graph
+          </Button>
         </div>
       </Card>
     </div>

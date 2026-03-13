@@ -1,9 +1,9 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import { BrowserRouter } from "react-router-dom";
 import DashboardPage from "../pages/DashboardPage";
 
-// Mock fetch for API calls
+// Mock fetch — reject so we get demo fallback
 globalThis.fetch = vi.fn(() =>
   Promise.reject(new Error("No API")),
 ) as unknown as typeof fetch;
@@ -17,31 +17,39 @@ function renderPage() {
 }
 
 describe("DashboardPage", () => {
-  it("renders metric cards", () => {
+  it("renders metric cards after loading", async () => {
     renderPage();
-    expect(screen.getByText("Total Fleet Size")).toBeInTheDocument();
-    expect(screen.getByText("Annual GHG")).toBeInTheDocument();
-    expect(screen.getByText("BEV Share")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Total Fleet Size")).toBeInTheDocument();
+      expect(screen.getByText(/Annual GHG/)).toBeInTheDocument();
+      expect(screen.getByText("BEV Share")).toBeInTheDocument();
+      expect(screen.getByText("Total VMT")).toBeInTheDocument();
+    });
   });
 
-  it("renders GHG trajectory chart section", () => {
+  it("renders chart sections", async () => {
     renderPage();
-    expect(screen.getByText("GHG Emissions Trajectory")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(
+        screen.getByText("GHG Emissions by Component"),
+      ).toBeInTheDocument();
+      expect(screen.getByText("Fleet Composition")).toBeInTheDocument();
+    });
   });
 
-  it("renders fleet composition chart section", () => {
+  it("renders quick action buttons", async () => {
     renderPage();
-    expect(screen.getByText("Fleet Composition")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Run Simulation")).toBeInTheDocument();
+      expect(screen.getByText("Compare Scenarios")).toBeInTheDocument();
+      expect(screen.getByText("Explore Causal Graph")).toBeInTheDocument();
+    });
   });
 
-  it("renders quick actions", () => {
+  it("falls back to Demo Mode when API is down", async () => {
     renderPage();
-    expect(screen.getByText("Run Simulation")).toBeInTheDocument();
-    expect(screen.getByText("Compare Scenarios")).toBeInTheDocument();
-  });
-
-  it("shows Demo Mode when API is down", () => {
-    renderPage();
-    expect(screen.getByText("Demo Mode")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Demo Mode")).toBeInTheDocument();
+    });
   });
 });

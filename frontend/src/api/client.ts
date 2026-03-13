@@ -16,6 +16,35 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   health: () => request<{ status: string }>("/health"),
 
+  // Dashboard
+  getDashboard: () =>
+    request<{
+      metrics: {
+        fleet_size: number;
+        annual_ghg: number;
+        bev_share: number;
+        bev_share_final: number;
+        total_vmt: number;
+      };
+      trajectory: Array<{
+        year: number;
+        ghg: number;
+        production: number;
+        usage: number;
+        disposal: number;
+      }>;
+      composition: Array<{
+        year: number;
+        total_vehicles: number;
+        total_vmt: number;
+        ICEV: number;
+        HEV: number;
+        PHEV: number;
+        BEV: number;
+      }>;
+      wall_clock_seconds: number;
+    }>("/dashboard"),
+
   // Scenarios
   listScenarios: () =>
     request<

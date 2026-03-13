@@ -82,6 +82,78 @@ def health_check():
     return {"status": "ok", "version": "0.1.0"}
 
 
+# --- Dashboard ---
+
+_dashboard_cache: dict[str, Any] | None = None
+
+
+@app.get("/dashboard")
+def get_dashboard():
+    """Run a baseline simulation and return dashboard summary data."""
+    global _dashboard_cache
+    if _dashboard_cache is not None:
+        return _dashboard_cache
+
+    graph = get_graph()
+    config = SimulationConfig(
+        start_year=2024,
+        num_years=10,
+        execution_mode=ExecutionMode.DETERMINISTIC,
+    )
+    engine = SimulationEngine(graph, config)
+    result = engine.run(mode=ExecutionMode.DETERMINISTIC)
+
+    trajectory = []
+    composition = []
+    for yr in result.year_results:
+        # Emissions trajectory
+        te = yr.outputs.get("total_emissions", {})
+        if isinstance(te, dict):
+            total_ghg = te.get("total_ghg", 0)
+            trajectory.append({
+                "year": yr.year,
+                "ghg": round(total_ghg / 1e9, 2),  # Convert to Mt CO2e
+                "production": round(te.get("production_ghg", 0) / 1e9, 2),
+                "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
+                "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
+            })
+
+        # Fleet composition
+        fs = yr.outputs.get("fleet_snapshot", {})
+        if isinstance(fs, dict):
+            total = fs.get("total_vehicles", 1)
+            by_pt = fs.get("by_powertrain", {})
+            if isinstance(by_pt, dict) and isinstance(total, (int, float)) and total > 0:
+                composition.append({
+                    "year": yr.year,
+                    "total_vehicles": round(float(total)),
+                    "total_vmt": round(float(fs.get("total_vmt", 0))),
+                    "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
+                    "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
+                    "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
+                    "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
+                })
+
+    # Current metrics from first year
+    first_comp = composition[0] if composition else {}
+    last_comp = composition[-1] if composition else {}
+    first_traj = trajectory[0] if trajectory else {}
+
+    _dashboard_cache = {
+        "metrics": {
+            "fleet_size": first_comp.get("total_vehicles", 0),
+            "annual_ghg": first_traj.get("ghg", 0),
+            "bev_share": first_comp.get("BEV", 0),
+            "bev_share_final": last_comp.get("BEV", 0),
+            "total_vmt": first_comp.get("total_vmt", 0),
+        },
+        "trajectory": trajectory,
+        "composition": composition,
+        "wall_clock_seconds": result.wall_clock_seconds,
+    }
+    return _dashboard_cache
+
+
 # --- Scenario CRUD ---
 
 @app.post("/scenarios", status_code=201)
