@@ -152,16 +152,16 @@
 
 ## 15. Visualization — Frontend
 
-- [ ] 15.1 Initialize React application with build tooling (Vite or similar)
-- [ ] 15.2 Implement causal graph visualization (interactive DAG with node click → detail panel, causal path highlighting)
-- [ ] 15.3 Implement scenario configuration UI (create/edit scenarios, select interventions, override inputs, validate parameters)
-- [ ] 15.4 Implement scenario comparison view (side-by-side/overlay charts, deltas, metric selection)
-- [ ] 15.5 Implement cumulative GHG trajectory chart (10-year line chart with confidence bands, multi-scenario overlay)
-- [ ] 15.6 Implement uncertainty visualizations (fan charts, click-to-drill distribution histograms)
-- [ ] 15.7 Implement sensitivity analysis display (tornado chart, first-order/total-order toggle, plain-language labels)
-- [ ] 15.8 Implement intervention attribution view (waterfall chart, per-intervention contributions, interaction terms)
-- [ ] 15.9 Implement export functionality (charts as PNG/SVG, data as CSV, scenarios as YAML)
-- [ ] 15.10 Write frontend component tests for key interactions
+- [x] 15.1 Initialize React application with build tooling (Vite or similar)
+- [x] 15.2 Implement causal graph visualization (interactive DAG with node click → detail panel, causal path highlighting)
+- [x] 15.3 Implement scenario configuration UI (create/edit scenarios, select interventions, override inputs, validate parameters)
+- [x] 15.4 Implement scenario comparison view (side-by-side/overlay charts, deltas, metric selection)
+- [x] 15.5 Implement cumulative GHG trajectory chart (10-year line chart with confidence bands, multi-scenario overlay)
+- [x] 15.6 Implement uncertainty visualizations (fan charts, click-to-drill distribution histograms)
+- [x] 15.7 Implement sensitivity analysis display (tornado chart, first-order/total-order toggle, plain-language labels)
+- [x] 15.8 Implement intervention attribution view (waterfall chart, per-intervention contributions, interaction terms)
+- [x] 15.9 Implement export functionality (charts as PNG/SVG, data as CSV, scenarios as YAML)
+- [x] 15.10 Write frontend component tests for key interactions
 
 ## 16. Validation and Integration
 

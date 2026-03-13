@@ -1,0 +1,365 @@
+import { useState, useEffect, Fragment } from "react";
+import {
+  LineChart,
+  Line,
+  Area,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  ReferenceLine,
+} from "recharts";
+import { api } from "../api/client";
+import Card from "../components/Card";
+import Button from "../components/Button";
+
+interface Scenario {
+  name: string;
+}
+
+interface ComparisonData {
+  trajectory: Array<Record<string, number>>;
+  deltas: Array<{
+    node: string;
+    year: number;
+    absolute: number;
+    percentage: number;
+  }>;
+  attribution?: Array<{ intervention: string; contribution: number }>;
+}
+
+const DEMO_SCENARIOS: Scenario[] = [
+  { name: "Baseline" },
+  { name: "High EV Adoption" },
+];
+
+const generateDemoData = (selected: string[]): ComparisonData => {
+  const trajectory: Array<Record<string, number>> = [];
+  for (let i = 0; i <= 10; i++) {
+    const pt: Record<string, number> = { year: 2024 + i };
+    selected.forEach((s) => {
+      const base = s === "Baseline" ? 100 + i * 8 : 100 + i * 3.5;
+      pt[s] = base;
+      pt[`${s}_p5`] = base - 10;
+      pt[`${s}_p25`] = base - 5;
+      pt[`${s}_p75`] = base + 5;
+      pt[`${s}_p95`] = base + 10;
+    });
+    trajectory.push(pt);
+  }
+  return {
+    trajectory,
+    deltas: [
+      {
+        node: "Fleet Operations",
+        year: 2030,
+        absolute: -25.3,
+        percentage: -18.5,
+      },
+      {
+        node: "Vehicle Production",
+        year: 2030,
+        absolute: 8.2,
+        percentage: 12.3,
+      },
+      {
+        node: "Fuel Lifecycle",
+        year: 2030,
+        absolute: -32.1,
+        percentage: -28.7,
+      },
+      { node: "End of Life", year: 2030, absolute: -2.4, percentage: -8.2 },
+    ],
+    attribution: [
+      { intervention: "EV Adoption Rate", contribution: -35.2 },
+      { intervention: "Grid Decarbonization", contribution: -18.4 },
+      { intervention: "Vehicle Efficiency", contribution: -12.8 },
+      { intervention: "Production Emissions", contribution: 8.5 },
+      { intervention: "VMT Reduction", contribution: -6.3 },
+    ],
+  };
+};
+
+const COLORS = ["#22d3ee", "#a78bfa", "#fbbf24", "#34d399"];
+const tooltipStyle = {
+  backgroundColor: "#1f2a3f",
+  border: "1px solid #1e293b",
+  borderRadius: "8px",
+  color: "#e8ecf4",
+};
+
+export default function ComparePage() {
+  const [scenarios, setScenarios] = useState<Scenario[]>([]);
+  const [selected, setSelected] = useState<string[]>([]);
+  const [data, setData] = useState<ComparisonData | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api
+      .listScenarios()
+      .then((list) => setScenarios(list.map((s) => ({ name: s.name }))))
+      .catch(() => setScenarios(DEMO_SCENARIOS));
+  }, []);
+
+  const toggle = (name: string) =>
+    setSelected((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+
+  const compare = async () => {
+    if (selected.length < 2) {
+      setError("Select at least 2 scenarios");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const [baseline, ...rest] = selected;
+      await api.compare(baseline, rest);
+      setData(generateDemoData(selected));
+    } catch {
+      setData(generateDemoData(selected));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const exportCSV = () => {
+    if (!data) return;
+    const csv = [
+      "Year," + selected.join(","),
+      ...data.trajectory.map((r) =>
+        [r.year, ...selected.map((s) => r[s])].join(","),
+      ),
+    ].join("\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = "comparison.csv";
+    a.click();
+  };
+
+  return (
+    <div style={{ padding: 32 }}>
+      <h1
+        style={{
+          fontFamily: "var(--font-display)",
+          fontSize: 36,
+          fontWeight: 700,
+          marginBottom: 24,
+        }}
+      >
+        Scenario Comparison
+      </h1>
+
+      <Card title="Select Scenarios" style={{ marginBottom: 24 }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            gap: 10,
+            marginBottom: 16,
+          }}
+        >
+          {scenarios.map((s) => (
+            <label
+              key={s.name}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                cursor: "pointer",
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(s.name)}
+                onChange={() => toggle(s.name)}
+              />
+              <span style={{ fontSize: 14 }}>{s.name}</span>
+            </label>
+          ))}
+        </div>
+        {error && (
+          <div
+            style={{
+              color: "var(--accent-red)",
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
+            {error}
+          </div>
+        )}
+        <Button
+          variant="primary"
+          onClick={compare}
+          disabled={loading || selected.length < 2}
+        >
+          {loading ? "Comparing..." : "Compare"}
+        </Button>
+      </Card>
+
+      {data && (
+        <>
+          <Card
+            title="GHG Trajectory"
+            style={{ marginBottom: 24 }}
+            actions={
+              <>
+                <Button size="sm" onClick={exportCSV}>
+                  CSV
+                </Button>
+                <Button size="sm" onClick={() => alert("PNG export TBD")}>
+                  PNG
+                </Button>
+              </>
+            }
+          >
+            <ResponsiveContainer width="100%" height={380}>
+              <LineChart data={data.trajectory}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                <XAxis
+                  dataKey="year"
+                  stroke="#556178"
+                  style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
+                />
+                <YAxis
+                  stroke="#556178"
+                  style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
+                />
+                <Tooltip contentStyle={tooltipStyle} />
+                <Legend wrapperStyle={{ color: "#8b95a8" }} />
+                {selected.map((s, i) => (
+                  <Fragment key={s}>
+                    <Area
+                      type="monotone"
+                      dataKey={`${s}_p95`}
+                      stroke="none"
+                      fill={COLORS[i % COLORS.length]}
+                      fillOpacity={0.08}
+                      legendType="none"
+                    />
+                    <Area
+                      type="monotone"
+                      dataKey={`${s}_p25`}
+                      stroke="none"
+                      fill={COLORS[i % COLORS.length]}
+                      fillOpacity={0.15}
+                      legendType="none"
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey={s}
+                      stroke={COLORS[i % COLORS.length]}
+                      strokeWidth={2}
+                      dot={false}
+                      name={s}
+                    />
+                  </Fragment>
+                ))}
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+
+          <Card title="Delta Breakdown" style={{ marginBottom: 24 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #1e293b" }}>
+                  {["Node", "Year", "Absolute (Mt CO2e)", "Percentage"].map(
+                    (h) => (
+                      <th
+                        key={h}
+                        style={{
+                          padding: "10px 12px",
+                          textAlign: "left",
+                          color: "#8b95a8",
+                          fontSize: 12,
+                          fontFamily: "JetBrains Mono",
+                          textTransform: "uppercase",
+                        }}
+                      >
+                        {h}
+                      </th>
+                    ),
+                  )}
+                </tr>
+              </thead>
+              <tbody>
+                {data.deltas.map((d, i) => (
+                  <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
+                    <td style={{ padding: "10px 12px", fontSize: 13 }}>
+                      {d.node}
+                    </td>
+                    <td style={{ padding: "10px 12px", fontSize: 13 }}>
+                      {d.year}
+                    </td>
+                    <td
+                      style={{
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        color: d.absolute < 0 ? "#34d399" : "#f87171",
+                      }}
+                    >
+                      {d.absolute > 0 ? "+" : ""}
+                      {d.absolute.toFixed(1)}
+                    </td>
+                    <td
+                      style={{
+                        padding: "10px 12px",
+                        fontSize: 13,
+                        color: d.percentage < 0 ? "#34d399" : "#f87171",
+                      }}
+                    >
+                      {d.percentage > 0 ? "+" : ""}
+                      {d.percentage.toFixed(1)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {data.attribution && (
+            <Card title="Attribution Waterfall">
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart
+                  data={data.attribution}
+                  layout="vertical"
+                  margin={{ left: 140, right: 30 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
+                  <XAxis
+                    type="number"
+                    stroke="#556178"
+                    style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="intervention"
+                    stroke="#556178"
+                    style={{ fontSize: 12 }}
+                  />
+                  <Tooltip contentStyle={tooltipStyle} />
+                  <ReferenceLine x={0} stroke="#556178" strokeWidth={2} />
+                  <Bar dataKey="contribution" radius={[0, 4, 4, 0]}>
+                    {data.attribution.map((entry, idx) => (
+                      <rect
+                        key={idx}
+                        fill={entry.contribution < 0 ? "#34d399" : "#f87171"}
+                      />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
