@@ -108,3 +108,26 @@ pre {
 .react-flow__background {
   background: var(--bg-primary) !important;
 }
+.react-flow__controls button {
+  background: var(--bg-elevated) !important;
+  border-color: var(--border-subtle) !important;
+  fill: var(--text-secondary) !important;
+  color: var(--text-secondary) !important;
+}
+.react-flow__controls button:hover {
+  background: var(--bg-hover) !important;
+}
+
+/* Recharts overrides for dark theme */
+.recharts-default-tooltip {
+  background-color: #1f2a3f !important;
+  border: 1px solid #1e293b !important;
+  border-radius: 8px !important;
+  color: #e8ecf4 !important;
+}
+.recharts-tooltip-item {
+  color: #e8ecf4 !important;
+}
+.recharts-legend-item-text {
+  color: #8b95a8 !important;
+}

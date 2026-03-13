@@ -230,7 +230,7 @@ export default function SensitivityPage() {
                 style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
                 domain={[-50, 50]}
                 ticks={[-50, -25, 0, 25, 50]}
-                tickFormatter={(v: number) => `${Math.abs(v)}%`}
+                tickFormatter={(v) => `${Math.abs(Number(v))}%`}
               />
               <YAxis
                 type="category"

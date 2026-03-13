@@ -5,6 +5,7 @@ import {
   Area,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -348,7 +349,7 @@ export default function ComparePage() {
                   <ReferenceLine x={0} stroke="#556178" strokeWidth={2} />
                   <Bar dataKey="contribution" radius={[0, 4, 4, 0]}>
                     {data.attribution.map((entry, idx) => (
-                      <rect
+                      <Cell
                         key={idx}
                         fill={entry.contribution < 0 ? "#34d399" : "#f87171"}
                       />
