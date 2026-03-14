@@ -70,3 +70,12 @@ export interface UncertaintyBand {
   p75: number;
   p95: number;
 }
+
+export interface TraceResponse {
+  scenario: string;
+  node: string;
+  years: number[];
+  values: number[];
+  fields: string[] | null;
+  field_values: Record<string, number[]> | null;
+}

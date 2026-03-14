@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Button from "../components/Button";
 import Card from "../components/Card";
+import NodeTraceChart from "../components/NodeTraceChart";
+import type { Trace } from "../components/NodeTraceChart";
 import { api } from "../api/client";
 import type { ScenarioConfig, RunResult } from "../types";
 
@@ -90,6 +92,8 @@ export default function ScenariosPage() {
     "deterministic",
   );
   const [numYears, setNumYears] = useState(10);
+  const [traceNode, setTraceNode] = useState<string | null>(null);
+  const [traceField, setTraceField] = useState<string | null>(null);
 
   // Load scenarios on mount
   useEffect(() => {
@@ -355,6 +359,47 @@ export default function ScenariosPage() {
       }
     }
   }
+
+  // Extract node list and trace from run result
+  const runResult = selectedScenario?.runResult ?? null;
+  const nodeNames = useMemo(() => {
+    if (!runResult) return [];
+    const firstYear = runResult.years[0];
+    const outputs = runResult.outputs[firstYear];
+    return outputs ? Object.keys(outputs).sort() : [];
+  }, [runResult]);
+
+  const traceFields = useMemo(() => {
+    if (!runResult || !traceNode) return null;
+    const firstYear = runResult.years[0];
+    const val = runResult.outputs[firstYear]?.[traceNode];
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      return Object.keys(val as Record<string, number>);
+    }
+    return null;
+  }, [runResult, traceNode]);
+
+  const traceData: Trace | null = useMemo(() => {
+    if (!runResult || !traceNode) return null;
+    const years = runResult.years;
+    const values = years.map((yr) => {
+      const val = runResult.outputs[yr]?.[traceNode];
+      if (val === undefined || val === null) return 0;
+      if (typeof val === "number") return val;
+      if (typeof val === "object" && !Array.isArray(val)) {
+        const dict = val as Record<string, number>;
+        const field = traceField ?? traceFields?.[0] ?? null;
+        return field ? (dict[field] ?? 0) : 0;
+      }
+      return 0;
+    });
+    return { scenario: selectedScenario?.name ?? "", years, values };
+  }, [runResult, traceNode, traceField, traceFields, selectedScenario]);
+
+  // Reset trace field when node changes
+  useEffect(() => {
+    setTraceField(null);
+  }, [traceNode]);
 
   const activeScenario = isNewScenario
     ? {
@@ -994,6 +1039,111 @@ export default function ScenariosPage() {
                         )}
                       </div>
                     </div>
+                  )}
+
+                  {/* Node Trace */}
+                  {selectedScenario.runResult && nodeNames.length > 0 && (
+                    <Card title="Node Value Trace" style={{ marginTop: 20 }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 16,
+                        }}
+                      >
+                        <div
+                          style={{
+                            width: 180,
+                            maxHeight: 300,
+                            overflow: "auto",
+                            borderRight: "1px solid var(--border-subtle)",
+                            paddingRight: 12,
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 11,
+                              color: "var(--text-muted)",
+                              textTransform: "uppercase",
+                              marginBottom: 8,
+                            }}
+                          >
+                            Nodes
+                          </div>
+                          {nodeNames.map((name) => (
+                            <div
+                              key={name}
+                              onClick={() => setTraceNode(name)}
+                              style={{
+                                padding: "6px 8px",
+                                fontSize: 12,
+                                fontFamily: "var(--font-mono)",
+                                cursor: "pointer",
+                                borderRadius: "var(--radius-sm)",
+                                background:
+                                  traceNode === name
+                                    ? "var(--bg-elevated)"
+                                    : "transparent",
+                                color:
+                                  traceNode === name
+                                    ? "var(--text-primary)"
+                                    : "var(--text-secondary)",
+                              }}
+                            >
+                              {name}
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          {traceFields && (
+                            <div style={{ marginBottom: 12 }}>
+                              <select
+                                value={traceField ?? traceFields[0] ?? ""}
+                                onChange={(e) => setTraceField(e.target.value)}
+                                style={{
+                                  padding: "4px 8px",
+                                  background: "var(--bg-elevated)",
+                                  border: "1px solid var(--border-subtle)",
+                                  borderRadius: "var(--radius-sm)",
+                                  color: "var(--text-primary)",
+                                  fontSize: 12,
+                                  fontFamily: "var(--font-mono)",
+                                }}
+                              >
+                                {traceFields.map((f) => (
+                                  <option key={f} value={f}>
+                                    {f}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+                          {traceData ? (
+                            <NodeTraceChart
+                              traces={[traceData]}
+                              nodeName={traceNode ?? ""}
+                              fieldName={
+                                traceFields
+                                  ? (traceField ?? traceFields[0])
+                                  : undefined
+                              }
+                            />
+                          ) : (
+                            <div
+                              style={{
+                                display: "flex",
+                                justifyContent: "center",
+                                alignItems: "center",
+                                height: 200,
+                                color: "var(--text-muted)",
+                                fontSize: 13,
+                              }}
+                            >
+                              Select a node to view its trace
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </Card>
                   )}
 
                   {selectedScenario.error && (

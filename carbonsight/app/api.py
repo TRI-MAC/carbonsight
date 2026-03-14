@@ -365,6 +365,57 @@ def get_provenance(name: str, node_name: str):
     return {"scenario": name, "node": node_name, "report": report}
 
 
+# --- Node Trace ---
+
+@app.get("/scenarios/{name}/trace/{node_name}")
+def get_node_trace(name: str, node_name: str):
+    """Return year-by-year values for a single node from a completed run."""
+    result = _results_store.get(name)
+    if result is None:
+        raise HTTPException(status_code=404, detail=f"No results for '{name}'. Run it first.")
+
+    # Check node exists in outputs
+    first_year = result.year_results[0] if result.year_results else None
+    if first_year is None or node_name not in first_year.outputs:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Node '{node_name}' not found in results for '{name}'",
+        )
+
+    years: list[int] = []
+    raw_values: list[Any] = []
+    for yr in result.year_results:
+        if node_name in yr.outputs:
+            years.append(yr.year)
+            raw_values.append(yr.outputs[node_name])
+
+    # Determine if scalar or dict-valued
+    sample = raw_values[0] if raw_values else None
+    if isinstance(sample, dict):
+        fields = [k for k in sample.keys() if isinstance(sample[k], (int, float))]
+        field_values = {
+            field: [
+                float(v.get(field, 0)) if isinstance(v, dict) else 0.0
+                for v in raw_values
+            ]
+            for field in fields
+        }
+        values = field_values[fields[0]] if fields else []
+    else:
+        fields = None
+        field_values = None
+        values = [float(v) if isinstance(v, (int, float)) else 0.0 for v in raw_values]
+
+    return {
+        "scenario": name,
+        "node": node_name,
+        "years": years,
+        "values": values,
+        "fields": fields,
+        "field_values": field_values,
+    }
+
+
 # --- Sensitivity ---
 
 @app.get("/scenarios/{name}/sensitivity")

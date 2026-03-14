@@ -137,6 +137,12 @@ export const api = {
       `/scenarios/${encodeURIComponent(name)}/sensitivity`,
     ),
 
+  // Node Trace
+  getTrace: (scenario: string, nodeName: string) =>
+    request<import("../types").TraceResponse>(
+      `/scenarios/${encodeURIComponent(scenario)}/trace/${encodeURIComponent(nodeName)}`,
+    ),
+
   // Export
   exportScenario: (name: string, format: string) =>
     request<Record<string, unknown>>(

@@ -11,7 +11,9 @@ import type { Node, Edge } from "reactflow";
 import dagre from "@dagrejs/dagre";
 import "reactflow/dist/style.css";
 import { api } from "../api/client";
-import type { GraphNode } from "../types";
+import type { GraphNode, TraceResponse } from "../types";
+import NodeTraceChart from "../components/NodeTraceChart";
+import type { Trace } from "../components/NodeTraceChart";
 
 // Demo data for offline/fallback mode
 const DEMO_NODES: GraphNode[] = [
@@ -230,6 +232,18 @@ export default function GraphPage() {
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
+  // Trace state
+  const [scenarioNames, setScenarioNames] = useState<string[]>([]);
+  const [selectedTraceScenarios, setSelectedTraceScenarios] = useState<
+    string[]
+  >([]);
+  const [traceResponses, setTraceResponses] = useState<
+    Record<string, TraceResponse>
+  >({});
+  const [traceField, setTraceField] = useState<string | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
+  const [traceError, setTraceError] = useState<string | null>(null);
+
   // Fetch nodes from API
   useEffect(() => {
     const fetchNodes = async () => {
@@ -407,9 +421,70 @@ export default function GraphPage() {
     );
   }, [highlightMode, selectedNode, ancestors, descendants, setNodes, setEdges]);
 
+  // Fetch scenario names for trace selector
+  useEffect(() => {
+    api
+      .listScenarios()
+      .then((list) => setScenarioNames(list.map((s) => s.name)))
+      .catch(() => setScenarioNames([]));
+  }, []);
+
+  // Fetch traces when selected node or scenarios change
+  useEffect(() => {
+    if (!selectedNode || selectedTraceScenarios.length === 0) {
+      setTraceResponses({});
+      setTraceError(null);
+      return;
+    }
+    setTraceLoading(true);
+    setTraceError(null);
+    setTraceField(null);
+
+    Promise.all(
+      selectedTraceScenarios.map((scenario) =>
+        api
+          .getTrace(scenario, selectedNode.name)
+          .then((resp) => ({ scenario, resp }))
+          .catch(() => ({ scenario, resp: null })),
+      ),
+    ).then((results) => {
+      const responses: Record<string, TraceResponse> = {};
+      let anySuccess = false;
+      for (const { scenario, resp } of results) {
+        if (resp) {
+          responses[scenario] = resp;
+          anySuccess = true;
+        }
+      }
+      setTraceResponses(responses);
+      if (!anySuccess && selectedTraceScenarios.length > 0) {
+        setTraceError("Run a scenario to see value traces");
+      }
+      setTraceLoading(false);
+    });
+  }, [selectedNode, selectedTraceScenarios]);
+
+  // Derive trace data for chart
+  const traceFields = useMemo(() => {
+    const first = Object.values(traceResponses)[0];
+    return first?.fields ?? null;
+  }, [traceResponses]);
+
+  const traces: Trace[] = useMemo(() => {
+    return Object.entries(traceResponses).map(([scenario, resp]) => {
+      let values = resp.values;
+      if (resp.fields && resp.field_values) {
+        const field = traceField ?? resp.fields[0];
+        values = resp.field_values[field] ?? resp.values;
+      }
+      return { scenario, years: resp.years, values };
+    });
+  }, [traceResponses, traceField]);
+
   // Handle node click
   const onNodeClick = useCallback((_event: React.MouseEvent, node: Node) => {
     setSelectedNode(node.data.graphNode);
+    setSelectedTraceScenarios([]);
   }, []);
 
   // Get upstream and downstream node names for detail panel
@@ -637,6 +712,107 @@ export default function GraphPage() {
               </div>
             ) : (
               <div style={styles.subtext}>No downstream dependents</div>
+            )}
+          </div>
+
+          {/* Value Trace */}
+          <div style={styles.detailSection}>
+            <div style={styles.detailLabel}>Value Trace</div>
+            {scenarioNames.length === 0 ? (
+              <div style={styles.subtext}>
+                Run a scenario to see value traces
+              </div>
+            ) : (
+              <>
+                <div
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 4,
+                    marginBottom: 12,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--text-muted)",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Select scenarios:
+                  </div>
+                  {scenarioNames.map((name) => (
+                    <label
+                      key={name}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 12,
+                        cursor: "pointer",
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedTraceScenarios.includes(name)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setSelectedTraceScenarios((prev) => [
+                              ...prev,
+                              name,
+                            ]);
+                          } else {
+                            setSelectedTraceScenarios((prev) =>
+                              prev.filter((n) => n !== name),
+                            );
+                          }
+                        }}
+                      />
+                      {name}
+                    </label>
+                  ))}
+                </div>
+                {traceFields && (
+                  <div style={{ marginBottom: 12 }}>
+                    <select
+                      value={traceField ?? traceFields[0] ?? ""}
+                      onChange={(e) => setTraceField(e.target.value)}
+                      style={{
+                        padding: "4px 8px",
+                        background: "var(--bg-elevated)",
+                        border: "1px solid var(--border-subtle)",
+                        borderRadius: "var(--radius-sm)",
+                        color: "var(--text-primary)",
+                        fontSize: 12,
+                        fontFamily: "var(--font-mono)",
+                      }}
+                    >
+                      {traceFields.map((f) => (
+                        <option key={f} value={f}>
+                          {f}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                {traceLoading ? (
+                  <div style={styles.subtext}>Loading traces...</div>
+                ) : traceError ? (
+                  <div style={styles.subtext}>{traceError}</div>
+                ) : traces.length > 0 ? (
+                  <NodeTraceChart
+                    traces={traces}
+                    nodeName={selectedNode.name}
+                    fieldName={
+                      traceFields ? (traceField ?? traceFields[0]) : undefined
+                    }
+                  />
+                ) : selectedTraceScenarios.length > 0 ? (
+                  <div style={styles.subtext}>
+                    No trace data for selected scenarios
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
         </div>

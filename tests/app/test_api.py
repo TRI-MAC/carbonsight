@@ -149,6 +149,33 @@ class TestProvenance:
         assert response.status_code == 404
 
 
+class TestNodeTrace:
+    def test_trace_scalar_node(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        client.post("/scenarios/baseline/run", json={"mode": "deterministic", "num_years": 3})
+        response = client.get("/scenarios/baseline/trace/output")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scenario"] == "baseline"
+        assert data["node"] == "output"
+        assert len(data["years"]) == 3
+        assert len(data["values"]) == 3
+        assert data["fields"] is None
+        assert data["field_values"] is None
+
+    def test_trace_no_results(self, client):
+        response = client.get("/scenarios/missing/trace/output")
+        assert response.status_code == 404
+        assert "Run it first" in response.json()["detail"]
+
+    def test_trace_node_not_found(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        client.post("/scenarios/baseline/run", json={"mode": "deterministic", "num_years": 1})
+        response = client.get("/scenarios/baseline/trace/nonexistent_node")
+        assert response.status_code == 404
+        assert "not found in results" in response.json()["detail"]
+
+
 class TestExport:
     def test_export_yaml(self, client):
         client.post("/scenarios", json={"name": "test", "overrides": {"input_a": 10}})
