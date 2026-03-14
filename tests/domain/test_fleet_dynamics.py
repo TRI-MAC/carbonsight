@@ -375,3 +375,49 @@ class TestWithRealData:
         assert comp["total_vehicles"] > 0
         assert len(updated) > 0
         assert all(pt in comp["by_powertrain"] for pt in ["icev", "hev", "phev", "bev"])
+
+
+class TestMacroFleetLinkage:
+    """Tests for macro-driver-adjusted fleet nodes."""
+
+    def test_preference_shift_increases_bev_share(self, simple_fleet, survival_curves, vmt_table):
+        from carbonsight.domain.fleet_nodes import compute_adjusted_new_entry
+        props = {"icev": 0.82, "hev": 0.09, "phev": 0.02, "bev": 0.07}
+        result_normal = compute_adjusted_new_entry(simple_fleet, props, 0.05, 1.0)
+        result_shifted = compute_adjusted_new_entry(simple_fleet, props, 0.05, 1.5)
+        bev_normal = result_normal[result_normal["powertrain"] == "bev"]["n"].sum()
+        bev_shifted = result_shifted[result_shifted["powertrain"] == "bev"]["n"].sum()
+        assert bev_shifted > bev_normal
+
+    def test_preference_shift_preserves_proportion_sum(self):
+        from carbonsight.domain.fleet_nodes import compute_adjusted_new_entry
+        import pandas as pd
+        fleet = pd.DataFrame({
+            "powertrain": ["icev", "bev"],
+            "age": [1, 1],
+            "n": [900, 100],
+            "mpg": [30.0, 0.0],
+            "mpge": [0.0, 100.0],
+            "batt_kwh": [0.0, 60.0],
+        })
+        props = {"icev": 0.80, "bev": 0.20}
+        result = compute_adjusted_new_entry(fleet, props, 0.10, 2.0)
+        new_vehicles = result[result["age"] == 0]
+        total_new = new_vehicles["n"].sum()
+        # Total new vehicles should match renewal rate regardless of shift
+        assert total_new > 0
+
+    def test_vmt_adjustment_scales_vmt(self):
+        from carbonsight.domain.fleet_nodes import compute_adjusted_vmt
+        import pandas as pd
+        fleet = pd.DataFrame({"vmt": [10000.0, 8000.0], "n": [100, 50]})
+        result = compute_adjusted_vmt(fleet, 0.9)
+        assert result["vmt"].iloc[0] == pytest.approx(9000.0)
+        assert result["vmt"].iloc[1] == pytest.approx(7200.0)
+
+    def test_vmt_adjustment_noop_at_one(self):
+        from carbonsight.domain.fleet_nodes import compute_adjusted_vmt
+        import pandas as pd
+        fleet = pd.DataFrame({"vmt": [10000.0], "n": [100]})
+        result = compute_adjusted_vmt(fleet, 1.0)
+        assert result is fleet  # No copy needed

@@ -6,6 +6,19 @@ import type { Trace } from "../components/NodeTraceChart";
 import { api } from "../api/client";
 import type { ScenarioConfig, RunResult } from "../types";
 
+interface CatalogItem {
+  type: string;
+  category: string;
+  description: string;
+  params: Array<{
+    name: string;
+    type: string;
+    default: unknown;
+    min: number | null;
+    max: number | null;
+  }>;
+}
+
 interface InterventionValue {
   category: string;
   name: string;
@@ -21,55 +34,40 @@ interface ScenarioWithStatus extends ScenarioConfig {
   error?: string;
 }
 
-const INTERVENTION_CATEGORIES = {
+const FALLBACK_CATEGORIES: Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> = {
   Policy: [
     { name: "carbon_pricing", label: "Carbon pricing", unit: "$/ton", min: 0 },
     { name: "ev_subsidy", label: "EV subsidy", unit: "$", min: 0 },
-    { name: "zev_mandate", label: "ZEV mandate", unit: "%", min: 0, max: 100 },
-    { name: "cafe_standard", label: "CAFE standard", unit: "mpg", min: 0 },
+    { name: "scrappage_program", label: "Scrappage program", unit: "factor", min: 1, max: 5 },
   ],
   Technology: [
-    {
-      name: "battery_cost_reduction",
-      label: "Battery cost reduction",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
-    {
-      name: "vehicle_lightweighting",
-      label: "Vehicle lightweighting",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
+    { name: "battery_cost_reduction", label: "Battery cost reduction", unit: "%", min: 0, max: 100 },
   ],
   Behavioral: [
-    {
-      name: "vmt_reduction",
-      label: "VMT reduction",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
-    {
-      name: "phev_charging_improvement",
-      label: "PHEV charging improvement",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
+    { name: "vmt_reduction", label: "VMT reduction", unit: "factor", min: 0.5, max: 1.0 },
+    { name: "phev_charging_improvement", label: "PHEV charging improvement", unit: "factor", min: 0.5, max: 1.0 },
   ],
   "Grid/Energy": [
-    {
-      name: "grid_decarbonization_rate",
-      label: "Grid decarbonization rate",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
+    { name: "grid_decarbonization", label: "Grid decarbonization", unit: "trajectory", min: 0, max: 1 },
   ],
 };
+
+function catalogToCategories(catalog: CatalogItem[]): Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> {
+  const categories: Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> = {};
+  for (const item of catalog) {
+    const cat = item.category.replace(/_/g, "/").replace(/\b\w/g, (c) => c.toUpperCase());
+    if (!categories[cat]) categories[cat] = [];
+    const mainParam = item.params[0];
+    categories[cat].push({
+      name: item.type,
+      label: item.description,
+      unit: mainParam?.type === "float" ? (mainParam.name.includes("factor") ? "factor" : "value") : "value",
+      min: mainParam?.min ?? undefined,
+      max: mainParam?.max ?? undefined,
+    });
+  }
+  return categories;
+}
 
 export default function ScenariosPage() {
   const [scenarios, setScenarios] = useState<ScenarioWithStatus[]>([]);
@@ -78,6 +76,9 @@ export default function ScenariosPage() {
   const [isNewScenario, setIsNewScenario] = useState(false);
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [interventionCategories, setInterventionCategories] = useState<
+    Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>>
+  >(FALLBACK_CATEGORIES);
 
   // Form state
   const [scenarioName, setScenarioName] = useState("");
@@ -103,12 +104,18 @@ export default function ScenariosPage() {
   async function loadScenarios() {
     try {
       setLoading(true);
-      const data = await api.listScenarios();
+      const [data, catalog] = await Promise.all([
+        api.listScenarios(),
+        api.listInterventions().catch(() => null),
+      ]);
       const scenariosWithStatus: ScenarioWithStatus[] = data.map((s) => ({
         ...s,
         status: "idle" as const,
       }));
       setScenarios(scenariosWithStatus);
+      if (catalog) {
+        setInterventionCategories(catalogToCategories(catalog));
+      }
       setDemoMode(false);
     } catch (error) {
       console.warn("API unavailable, using demo mode:", error);
@@ -139,7 +146,7 @@ export default function ScenariosPage() {
     Object.entries(scenario.overrides).forEach(([key, value]) => {
       // Find matching intervention
       for (const [category, interventionList] of Object.entries(
-        INTERVENTION_CATEGORIES,
+        interventionCategories,
       )) {
         const intervention = interventionList.find((i) => i.name === key);
         if (intervention) {
@@ -158,7 +165,7 @@ export default function ScenariosPage() {
 
     // Custom overrides
     const customKeys = Object.keys(scenario.overrides).filter((key) => {
-      return !Object.values(INTERVENTION_CATEGORIES)
+      return !Object.values(interventionCategories)
         .flat()
         .some((i) => i.name === key);
     });
@@ -222,11 +229,14 @@ export default function ScenariosPage() {
       return;
     }
 
-    const overrides: Record<string, unknown> = {};
-    Object.values(interventions).forEach((intervention) => {
-      overrides[intervention.name] = intervention.value;
-    });
+    // Build structured intervention specs
+    const interventionSpecs = Object.values(interventions).map((iv) => ({
+      type: iv.name,
+      params: { [iv.name === "vmt_reduction" ? "factor" : "value"]: iv.value },
+    }));
 
+    // Custom overrides go as raw overrides
+    const overrides: Record<string, unknown> = {};
     customOverrides.forEach(({ key, value }) => {
       if (key.trim() && value.trim()) {
         try {
@@ -243,9 +253,14 @@ export default function ScenariosPage() {
           name: scenarioName,
           overrides,
           metadata: {},
+          interventions: interventionSpecs,
         });
       } else {
-        await api.updateScenario(scenarioName, { overrides, metadata: {} });
+        await api.updateScenario(scenarioName, {
+          overrides,
+          metadata: {},
+          interventions: interventionSpecs,
+        });
       }
       await loadScenarios();
       setIsNewScenario(false);
@@ -660,7 +675,7 @@ export default function ScenariosPage() {
                         fontFamily: "var(--font-body)",
                       }}
                     >
-                      {Object.keys(INTERVENTION_CATEGORIES).map((cat) => (
+                      {Object.keys(interventionCategories).map((cat) => (
                         <option key={cat} value={cat}>
                           {cat}
                         </option>
@@ -677,9 +692,7 @@ export default function ScenariosPage() {
                       marginBottom: 12,
                     }}
                   >
-                    {INTERVENTION_CATEGORIES[
-                      selectedCategory as keyof typeof INTERVENTION_CATEGORIES
-                    ].map((intervention) => {
+                    {(interventionCategories[selectedCategory] ?? []).map((intervention) => {
                       const isActive = interventions[intervention.name];
                       return (
                         <div

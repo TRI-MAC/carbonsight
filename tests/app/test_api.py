@@ -176,6 +176,92 @@ class TestNodeTrace:
         assert "not found in results" in response.json()["detail"]
 
 
+class TestInterventionCatalog:
+    def test_list_interventions(self, client):
+        response = client.get("/interventions")
+        assert response.status_code == 200
+        catalog = response.json()
+        assert len(catalog) == 7
+        types = [i["type"] for i in catalog]
+        assert "carbon_pricing" in types
+        assert "ev_subsidy" in types
+        assert "vmt_reduction" in types
+        for item in catalog:
+            assert "category" in item
+            assert "description" in item
+            assert "params" in item
+
+    def test_catalog_param_schemas(self, client):
+        response = client.get("/interventions")
+        catalog = response.json()
+        carbon = next(i for i in catalog if i["type"] == "carbon_pricing")
+        param_names = [p["name"] for p in carbon["params"]]
+        assert "price_per_tonne" in param_names
+        price_param = next(p for p in carbon["params"] if p["name"] == "price_per_tonne")
+        assert price_param["type"] == "float"
+        assert price_param["min"] == 10
+        assert price_param["max"] == 500
+
+
+class TestScenarioWithInterventions:
+    def test_create_with_interventions(self, client):
+        response = client.post("/scenarios", json={
+            "name": "ev_push",
+            "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
+        })
+        assert response.status_code == 201
+        data = response.json()
+        assert len(data["interventions"]) == 1
+        assert data["interventions"][0]["type"] == "vmt_reduction"
+
+    def test_update_with_interventions(self, client):
+        client.post("/scenarios", json={"name": "test"})
+        response = client.put("/scenarios/test", json={
+            "interventions": [{"type": "carbon_pricing", "params": {"price_per_tonne": 100}}],
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert len(data["interventions"]) == 1
+        assert data["interventions"][0]["type"] == "carbon_pricing"
+
+    def test_run_with_interventions(self, client):
+        client.post("/scenarios", json={
+            "name": "test",
+            "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
+        })
+        response = client.post("/scenarios/test/run", json={
+            "mode": "deterministic", "num_years": 2,
+        })
+        assert response.status_code == 200
+        data = response.json()
+        assert data["scenario"] == "test"
+        assert len(data["years"]) == 2
+
+    def test_run_with_invalid_intervention_type(self, client):
+        client.post("/scenarios", json={
+            "name": "bad",
+            "interventions": [{"type": "nonexistent", "params": {}}],
+        })
+        response = client.post("/scenarios/bad/run", json={
+            "mode": "deterministic", "num_years": 1,
+        })
+        assert response.status_code == 400
+        assert "Unknown intervention type" in response.json()["detail"]
+
+
+class TestSensitivity:
+    def test_sensitivity_requires_uq(self, client):
+        client.post("/scenarios", json={"name": "test"})
+        client.post("/scenarios/test/run", json={"mode": "deterministic", "num_years": 1})
+        response = client.get("/scenarios/test/sensitivity")
+        assert response.status_code == 400
+        assert "UQ mode" in response.json()["detail"]
+
+    def test_sensitivity_no_results(self, client):
+        response = client.get("/scenarios/missing/sensitivity")
+        assert response.status_code == 404
+
+
 class TestExport:
     def test_export_yaml(self, client):
         client.post("/scenarios", json={"name": "test", "overrides": {"input_a": 10}})

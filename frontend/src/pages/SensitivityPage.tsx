@@ -84,6 +84,7 @@ export default function SensitivityPage() {
     "totalOrder",
   );
   const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     api
@@ -104,8 +105,39 @@ export default function SensitivityPage() {
     setLoading(true);
     api
       .getSensitivity(selectedScenario)
-      .then(() => setSensitivityData(DEMO_SENSITIVITY))
-      .catch(() => setSensitivityData(DEMO_SENSITIVITY))
+      .then((result) => {
+        const drivers = (result as { drivers?: Array<{ input_node: string; first_order_index: number; total_order_index: number }> }).drivers;
+        if (drivers && drivers.length > 0) {
+          setSensitivityData(
+            drivers.map((d) => ({
+              parameter: d.input_node,
+              displayName: d.input_node.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              firstOrder: d.first_order_index,
+              totalOrder: d.total_order_index,
+            })),
+          );
+          setErrorMsg(null);
+        } else {
+          const msg = (result as { message?: string }).message;
+          if (msg) {
+            setErrorMsg(msg);
+            setSensitivityData([]);
+          } else {
+            setSensitivityData(DEMO_SENSITIVITY);
+            setErrorMsg(null);
+          }
+        }
+      })
+      .catch((err) => {
+        const errStr = String(err);
+        if (errStr.includes("UQ mode")) {
+          setErrorMsg("Sensitivity analysis requires a UQ mode run. Re-run the scenario in UQ mode.");
+          setSensitivityData([]);
+        } else {
+          setSensitivityData(DEMO_SENSITIVITY);
+          setErrorMsg(null);
+        }
+      })
       .finally(() => setLoading(false));
   }, [selectedScenario]);
 
@@ -215,6 +247,22 @@ export default function SensitivityPage() {
             }}
           >
             Loading...
+          </div>
+        ) : errorMsg ? (
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "center",
+              height: 400,
+              color: "var(--accent-amber)",
+              fontSize: 14,
+              flexDirection: "column",
+              gap: 8,
+            }}
+          >
+            <div style={{ fontSize: 24 }}>!</div>
+            <div>{errorMsg}</div>
           </div>
         ) : (
           <ResponsiveContainer width="100%" height={450}>

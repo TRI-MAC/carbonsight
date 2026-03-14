@@ -17,26 +17,41 @@ from carbonsight.core.engine import SimulationResult
 
 
 @dataclass
+class InterventionSpec:
+    """A lightweight reference to an intervention factory with parameters."""
+
+    type: str
+    params: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
 class Scenario:
     """A named configuration of input-node value overrides."""
 
     name: str
     overrides: dict[str, Any] = field(default_factory=dict)
     metadata: dict[str, Any] = field(default_factory=dict)
+    interventions: list[InterventionSpec] = field(default_factory=list)
 
     def to_dict(self) -> dict:
         return {
             "name": self.name,
             "overrides": {k: _serialize_value(v) for k, v in self.overrides.items()},
             "metadata": self.metadata,
+            "interventions": [{"type": i.type, "params": i.params} for i in self.interventions],
         }
 
     @classmethod
     def from_dict(cls, data: dict) -> Scenario:
+        interventions = [
+            InterventionSpec(type=i["type"], params=i.get("params", {}))
+            for i in data.get("interventions", [])
+        ]
         return cls(
             name=data["name"],
             overrides=data.get("overrides", {}),
             metadata=data.get("metadata", {}),
+            interventions=interventions,
         )
 
     def to_yaml(self) -> str:
@@ -230,3 +245,65 @@ def compare_distribution_results(
                 "p95_delta": i_summary.p95 - b_summary.p95,
             }
     return result
+
+
+# --- Intervention resolution ---
+
+INTERVENTION_FACTORIES = {
+    "carbon_pricing": "carbonsight.domain.interventions.carbon_pricing",
+    "ev_subsidy": "carbonsight.domain.interventions.ev_subsidy",
+    "vmt_reduction": "carbonsight.domain.interventions.vmt_reduction",
+    "grid_decarbonization": "carbonsight.domain.interventions.grid_decarbonization",
+    "battery_cost_reduction": "carbonsight.domain.interventions.battery_cost_reduction",
+    "scrappage_program": "carbonsight.domain.interventions.scrappage_program",
+    "phev_charging_improvement": "carbonsight.domain.interventions.phev_charging_improvement",
+}
+
+
+def resolve_interventions(specs: list[InterventionSpec]) -> list:
+    """Convert InterventionSpec list to Intervention objects via factory functions.
+
+    Returns list of Intervention objects.
+    Raises ValueError for unknown intervention types.
+    """
+    from carbonsight.domain import interventions as iv_module
+
+    factory_map = {
+        "carbon_pricing": iv_module.carbon_pricing,
+        "ev_subsidy": iv_module.ev_subsidy,
+        "vmt_reduction": iv_module.vmt_reduction,
+        "grid_decarbonization": iv_module.grid_decarbonization,
+        "battery_cost_reduction": iv_module.battery_cost_reduction,
+        "scrappage_program": iv_module.scrappage_program,
+        "phev_charging_improvement": iv_module.phev_charging_improvement,
+    }
+
+    results = []
+    for spec in specs:
+        factory = factory_map.get(spec.type)
+        if factory is None:
+            raise ValueError(
+                f"Unknown intervention type '{spec.type}'. "
+                f"Available: {', '.join(sorted(factory_map.keys()))}"
+            )
+        results.append(factory(**spec.params))
+    return results
+
+
+def resolve_year_overrides(
+    interventions: list,
+    years: list[int],
+) -> dict[int, dict[str, Any]]:
+    """Convert Intervention objects to per-year override dicts.
+
+    Uses combine_interventions_for_year() for each year to merge
+    multiple interventions with conflict detection.
+    """
+    from carbonsight.domain.interventions import combine_interventions_for_year
+
+    year_overrides: dict[int, dict[str, Any]] = {}
+    for year in years:
+        combined, _warnings = combine_interventions_for_year(interventions, year)
+        if combined:
+            year_overrides[year] = combined
+    return year_overrides

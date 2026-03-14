@@ -205,3 +205,63 @@ class TestFeedbackLoop:
         ts = result.output_timeseries("fleet_comp")
         values = list(ts.values())
         assert values[0] != values[1] != values[2]
+
+
+class TestYearSpecificOverrides:
+    def test_year_specific_override_applied(self):
+        g = SimulationGraph()
+        g.add_node(_make_input("rate", 0.05))
+        g.add_node(Node(
+            name="result",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda rate: rate * 100,
+        ))
+
+        config = SimulationConfig(start_year=2024, num_years=3)
+        result = SimulationEngine(g, config).run(
+            year_overrides={2025: {"rate": 0.10}},
+        )
+        assert result.outputs_for_year(2024)["result"] == pytest.approx(5.0)
+        assert result.outputs_for_year(2025)["result"] == pytest.approx(10.0)
+        assert result.outputs_for_year(2026)["result"] == pytest.approx(5.0)
+
+    def test_year_specific_takes_precedence_over_base(self):
+        g = SimulationGraph()
+        g.add_node(_make_input("rate", 0.05))
+        g.add_node(Node(
+            name="result",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda rate: rate * 100,
+        ))
+
+        config = SimulationConfig(start_year=2024, num_years=3)
+        result = SimulationEngine(g, config).run(
+            overrides={"rate": 0.10},
+            year_overrides={2025: {"rate": 0.20}},
+        )
+        # Base override: rate=0.10 every year, but 2025 overrides to 0.20
+        assert result.outputs_for_year(2024)["result"] == pytest.approx(10.0)
+        assert result.outputs_for_year(2025)["result"] == pytest.approx(20.0)
+        assert result.outputs_for_year(2026)["result"] == pytest.approx(10.0)
+
+    def test_year_overrides_in_uq_mode(self):
+        from carbonsight.core.engine import ExecutionMode
+
+        g = SimulationGraph()
+        g.add_node(_make_input("rate", 0.05))
+        g.add_node(Node(
+            name="result",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda rate: rate * 100,
+        ))
+
+        config = SimulationConfig(start_year=2024, num_years=2, uq_samples=5)
+        result = SimulationEngine(g, config).run(
+            mode=ExecutionMode.UQ,
+            year_overrides={2025: {"rate": 0.50}},
+        )
+        # UQ aggregates, but with no distributions, all samples are identical
+        y2024 = result.outputs_for_year(2024)["result"]
+        y2025 = result.outputs_for_year(2025)["result"]
+        assert y2024["mean"] == pytest.approx(5.0)
+        assert y2025["mean"] == pytest.approx(50.0)

@@ -48,7 +48,8 @@ class MacroDriverDefaults(BaseModel):
         default_factory=lambda: EnergyPriceTrajectory(
             name="Oil Price",
             unit="$/barrel",
-            values=[75.0] * 10,  # Flat default; override with EIA scenarios
+            # EIA AEO 2024 Reference case: gradual increase 2024-2033
+            values=[75.0, 77.0, 79.5, 82.0, 84.5, 87.0, 89.5, 92.0, 94.0, 96.0],
             source="EIA AEO 2024 Reference",
             scenario="reference",
         )
@@ -57,7 +58,8 @@ class MacroDriverDefaults(BaseModel):
         default_factory=lambda: EnergyPriceTrajectory(
             name="Electricity Price",
             unit="$/kWh",
-            values=[0.13] * 10,
+            # EIA AEO 2024 Reference case: slight decline as renewables grow
+            values=[0.130, 0.129, 0.127, 0.126, 0.124, 0.123, 0.121, 0.120, 0.118, 0.117],
             source="EIA AEO 2024 Reference",
             scenario="reference",
         )

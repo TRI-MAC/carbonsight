@@ -45,6 +45,23 @@ export const api = {
       wall_clock_seconds: number;
     }>("/dashboard"),
 
+  // Interventions
+  listInterventions: () =>
+    request<
+      Array<{
+        type: string;
+        category: string;
+        description: string;
+        params: Array<{
+          name: string;
+          type: string;
+          default: unknown;
+          min: number | null;
+          max: number | null;
+        }>;
+      }>
+    >("/interventions"),
+
   // Scenarios
   listScenarios: () =>
     request<
@@ -64,6 +81,7 @@ export const api = {
     name: string;
     overrides?: Record<string, unknown>;
     metadata?: Record<string, unknown>;
+    interventions?: Array<{ type: string; params: Record<string, unknown> }>;
   }) =>
     request<{ name: string }>("/scenarios", {
       method: "POST",
@@ -74,6 +92,7 @@ export const api = {
     data: {
       overrides?: Record<string, unknown>;
       metadata?: Record<string, unknown>;
+      interventions?: Array<{ type: string; params: Record<string, unknown> }>;
     },
   ) =>
     request<{ name: string }>(`/scenarios/${encodeURIComponent(name)}`, {

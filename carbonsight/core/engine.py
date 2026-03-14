@@ -92,6 +92,7 @@ class SimulationEngine:
         self,
         overrides: dict[str, Any] | None = None,
         mode: ExecutionMode | None = None,
+        year_overrides: dict[int, dict[str, Any]] | None = None,
     ) -> SimulationResult:
         """Run the simulation over the full time horizon.
 
@@ -99,6 +100,9 @@ class SimulationEngine:
             overrides: Optional dict of node_name -> value to override input nodes.
                 These overrides apply to every year step.
             mode: Execution mode override. If None, uses config.execution_mode.
+            year_overrides: Optional dict of year -> {node_name: value} for
+                time-varying overrides. Year-specific values take precedence
+                over base overrides.
 
         Returns:
             SimulationResult with year-by-year outputs and provenance.
@@ -114,14 +118,14 @@ class SimulationEngine:
             self.graph.validate()
 
             if exec_mode == ExecutionMode.DETERMINISTIC:
-                return self._run_deterministic(overrides)
+                return self._run_deterministic(overrides, year_overrides)
             else:
-                return self._run_uq(overrides)
+                return self._run_uq(overrides, year_overrides)
         finally:
             self._running = False
             self._active_mode = None
 
-    def _run_deterministic(self, overrides: dict[str, Any] | None) -> SimulationResult:
+    def _run_deterministic(self, overrides: dict[str, Any] | None, year_overrides: dict[int, dict[str, Any]] | None = None) -> SimulationResult:
         """Run in deterministic mode: collapse distributions to point estimates."""
         from carbonsight.core.distributions import Distribution
 
@@ -138,9 +142,13 @@ class SimulationEngine:
         prior_year_outputs: dict[str, Any] | None = None
         start_time = time.monotonic()
 
-        for year in self.config.years:
+        for idx, year in enumerate(self.config.years):
+            step_overrides = dict(effective_overrides)
+            step_overrides["year_index"] = idx
+            if year_overrides and year in year_overrides:
+                step_overrides.update(year_overrides[year])
             outputs, provenance = self.graph.execute(
-                overrides=effective_overrides,
+                overrides=step_overrides,
                 prior_year_outputs=prior_year_outputs,
             )
             result.year_results.append(YearResult(year=year, outputs=outputs, provenance=provenance))
@@ -150,7 +158,7 @@ class SimulationEngine:
         self._check_performance(result)
         return result
 
-    def _run_uq(self, overrides: dict[str, Any] | None) -> SimulationResult:
+    def _run_uq(self, overrides: dict[str, Any] | None, year_overrides: dict[int, dict[str, Any]] | None = None) -> SimulationResult:
         """Run in UQ mode: Monte Carlo propagation through the DAG."""
         import numpy as np
 
@@ -177,9 +185,13 @@ class SimulationEngine:
             prior_year_outputs: dict[str, Any] | None = None
             sample_year_results = []
 
-            for year in self.config.years:
+            for idx, year in enumerate(self.config.years):
+                step_overrides = dict(sample_overrides)
+                step_overrides["year_index"] = idx
+                if year_overrides and year in year_overrides:
+                    step_overrides.update(year_overrides[year])
                 outputs, provenance = self.graph.execute(
-                    overrides=sample_overrides,
+                    overrides=step_overrides,
                     prior_year_outputs=prior_year_outputs,
                 )
                 sample_year_results.append(YearResult(year=year, outputs=outputs, provenance=provenance))

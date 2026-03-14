@@ -162,3 +162,59 @@ class TestDistributionComparison:
         assert "ghg" in result
         assert 2024 in result["ghg"]
         assert result["ghg"][2024]["mean_delta"] < 0  # intervention lower
+
+
+class TestInterventionResolution:
+    def test_resolve_single_intervention(self):
+        from carbonsight.core.scenario import InterventionSpec, resolve_interventions
+
+        specs = [InterventionSpec(type="carbon_pricing", params={"price_per_tonne": 50})]
+        interventions = resolve_interventions(specs)
+        assert len(interventions) == 1
+        assert interventions[0].name == "carbon_pricing_50"
+
+    def test_resolve_multiple_interventions(self):
+        from carbonsight.core.scenario import InterventionSpec, resolve_interventions
+
+        specs = [
+            InterventionSpec(type="carbon_pricing", params={"price_per_tonne": 100}),
+            InterventionSpec(type="vmt_reduction", params={"factor": 0.9}),
+        ]
+        interventions = resolve_interventions(specs)
+        assert len(interventions) == 2
+
+    def test_resolve_unknown_type_raises(self):
+        from carbonsight.core.scenario import InterventionSpec, resolve_interventions
+
+        specs = [InterventionSpec(type="nonexistent", params={})]
+        with pytest.raises(ValueError, match="Unknown intervention type"):
+            resolve_interventions(specs)
+
+    def test_resolve_year_overrides(self):
+        from carbonsight.core.scenario import (
+            InterventionSpec,
+            resolve_interventions,
+            resolve_year_overrides,
+        )
+
+        specs = [InterventionSpec(type="carbon_pricing", params={"price_per_tonne": 50, "start_year": 2024})]
+        interventions = resolve_interventions(specs)
+        year_overrides = resolve_year_overrides(interventions, list(range(2024, 2034)))
+        # carbon_pricing sets year_overrides for years 2024-2033
+        assert len(year_overrides) > 0
+        assert 2024 in year_overrides
+
+    def test_scenario_with_interventions_serialization(self):
+        from carbonsight.core.scenario import InterventionSpec
+
+        s = Scenario(
+            name="test",
+            interventions=[InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}})],
+        )
+        d = s.to_dict()
+        assert len(d["interventions"]) == 1
+        assert d["interventions"][0]["type"] == "ev_subsidy"
+
+        restored = Scenario.from_dict(d)
+        assert len(restored.interventions) == 1
+        assert restored.interventions[0].type == "ev_subsidy"

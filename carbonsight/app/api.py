@@ -15,7 +15,8 @@ from pydantic import BaseModel
 from carbonsight.core.engine import ExecutionMode, SimulationConfig, SimulationEngine
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.core.node import Node, NodeType
-from carbonsight.core.scenario import Scenario, ScenarioStore
+from carbonsight.core.scenario import InterventionSpec, Scenario, ScenarioStore, resolve_interventions, resolve_year_overrides
+from carbonsight.domain.interventions import InterventionCategory
 
 app = FastAPI(
     title="CarbonSight API",
@@ -52,15 +53,22 @@ def set_graph(graph: SimulationGraph):
 
 # --- Request/Response Models ---
 
+class InterventionSpecModel(BaseModel):
+    type: str
+    params: dict[str, Any] = {}
+
+
 class ScenarioCreate(BaseModel):
     name: str
     overrides: dict[str, Any] = {}
     metadata: dict[str, Any] = {}
+    interventions: list[InterventionSpecModel] = []
 
 
 class ScenarioUpdate(BaseModel):
     overrides: dict[str, Any] | None = None
     metadata: dict[str, Any] | None = None
+    interventions: list[InterventionSpecModel] | None = None
 
 
 class RunRequest(BaseModel):
@@ -80,6 +88,77 @@ class CompareRequest(BaseModel):
 @app.get("/health")
 def health_check():
     return {"status": "ok", "version": "0.1.0"}
+
+
+# --- Intervention Catalog ---
+
+INTERVENTION_CATALOG = [
+    {
+        "type": "carbon_pricing",
+        "category": InterventionCategory.POLICY.value,
+        "description": "Carbon price applied to fuel costs",
+        "params": [
+            {"name": "price_per_tonne", "type": "float", "default": 50, "min": 10, "max": 500},
+            {"name": "start_year", "type": "int", "default": 2024, "min": 2024, "max": 2034},
+        ],
+    },
+    {
+        "type": "ev_subsidy",
+        "category": InterventionCategory.POLICY.value,
+        "description": "EV purchase subsidy shifting powertrain mix",
+        "params": [
+            {"name": "proportion_shift", "type": "dict", "default": {"bev": 0.15}, "min": None, "max": None},
+        ],
+    },
+    {
+        "type": "vmt_reduction",
+        "category": InterventionCategory.BEHAVIORAL.value,
+        "description": "Reduce vehicle miles traveled",
+        "params": [
+            {"name": "factor", "type": "float", "default": 0.9, "min": 0.5, "max": 1.0},
+        ],
+    },
+    {
+        "type": "grid_decarbonization",
+        "category": InterventionCategory.GRID_ENERGY.value,
+        "description": "Grid carbon intensity trajectory override",
+        "params": [
+            {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
+        ],
+    },
+    {
+        "type": "battery_cost_reduction",
+        "category": InterventionCategory.TECHNOLOGY.value,
+        "description": "Battery production emissions trajectory",
+        "params": [
+            {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
+        ],
+    },
+    {
+        "type": "scrappage_program",
+        "category": InterventionCategory.POLICY.value,
+        "description": "Accelerated scrappage for old vehicles",
+        "params": [
+            {"name": "age_threshold", "type": "int", "default": 15, "min": 5, "max": 25},
+            {"name": "acceleration_factor", "type": "float", "default": 2.0, "min": 1.1, "max": 5.0},
+            {"name": "duration_years", "type": "int", "default": 3, "min": 1, "max": 10},
+            {"name": "start_year", "type": "int", "default": 0, "min": 0, "max": 2034},
+        ],
+    },
+    {
+        "type": "phev_charging_improvement",
+        "category": InterventionCategory.BEHAVIORAL.value,
+        "description": "Improve PHEV charging behavior",
+        "params": [
+            {"name": "charging_factor", "type": "float", "default": 0.85, "min": 0.5, "max": 1.0},
+        ],
+    },
+]
+
+
+@app.get("/interventions")
+def list_interventions():
+    return INTERVENTION_CATALOG
 
 
 # --- Dashboard ---
@@ -158,14 +237,19 @@ def get_dashboard():
 
 @app.post("/scenarios", status_code=201)
 def create_scenario(body: ScenarioCreate):
+    interventions = [
+        InterventionSpec(type=i.type, params=i.params)
+        for i in body.interventions
+    ]
     scenario = Scenario(
-        name=body.name, overrides=body.overrides, metadata=body.metadata
+        name=body.name, overrides=body.overrides, metadata=body.metadata,
+        interventions=interventions,
     )
     try:
         scenario_store.create(scenario)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return {"name": scenario.name, "overrides": scenario.overrides}
+    return {"name": scenario.name, "overrides": scenario.overrides, "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions]}
 
 
 @app.get("/scenarios")
@@ -194,7 +278,12 @@ def update_scenario(name: str, body: ScenarioUpdate):
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Scenario '{name}' not found")
-    return {"name": scenario.name, "overrides": scenario.overrides}
+    if body.interventions is not None:
+        scenario.interventions = [
+            InterventionSpec(type=i.type, params=i.params)
+            for i in body.interventions
+        ]
+    return {"name": scenario.name, "overrides": scenario.overrides, "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions]}
 
 
 @app.delete("/scenarios/{name}", status_code=204)
@@ -224,8 +313,19 @@ def run_scenario(name: str, body: RunRequest):
         uq_samples=body.uq_samples,
     )
 
+    # Resolve interventions to year_overrides
+    year_overrides = None
+    if scenario.interventions:
+        try:
+            intervention_objs = resolve_interventions(scenario.interventions)
+            year_overrides = resolve_year_overrides(
+                intervention_objs, list(range(body.start_year, body.start_year + body.num_years))
+            )
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
     engine = SimulationEngine(graph, config)
-    result = engine.run(overrides=scenario.overrides, mode=mode)
+    result = engine.run(overrides=scenario.overrides, mode=mode, year_overrides=year_overrides)
 
     # Store result for later retrieval
     _results_store[name] = result
@@ -420,6 +520,8 @@ def get_node_trace(name: str, node_name: str):
 
 @app.get("/scenarios/{name}/sensitivity")
 def get_sensitivity(name: str):
+    from carbonsight.analysis.uncertainty import compute_sobol_indices, identify_top_drivers
+
     result = _results_store.get(name)
     if result is None:
         raise HTTPException(status_code=404, detail=f"No results for '{name}'")
@@ -430,9 +532,39 @@ def get_sensitivity(name: str):
             detail="Sensitivity analysis requires UQ mode results",
         )
 
+    # Collect input samples and output samples from UQ results
+    last_year = result.year_results[-1]
+    input_samples: dict[str, Any] = {}
+    output_samples = None
+
+    for node_name, value in last_year.outputs.items():
+        if isinstance(value, dict) and "samples" in value:
+            import numpy as np
+            samples = np.asarray(value["samples"])
+            if output_samples is None:
+                output_samples = samples
+            input_samples[node_name] = samples
+
+    if output_samples is None or len(input_samples) < 2:
+        return {
+            "scenario": name,
+            "drivers": [],
+            "message": "Insufficient sample data for sensitivity analysis",
+        }
+
+    sensitivity = compute_sobol_indices(input_samples, output_samples)
+    drivers = identify_top_drivers(sensitivity, top_n=10)
+
     return {
         "scenario": name,
-        "note": "Full Sobol analysis available via the analysis.uncertainty module",
+        "drivers": [
+            {
+                "input_node": d.input_node,
+                "total_order_index": round(d.total_order_index, 4),
+                "first_order_index": round(d.first_order_index, 4),
+            }
+            for d in drivers
+        ],
     }
 
 

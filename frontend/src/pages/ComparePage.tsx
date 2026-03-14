@@ -121,8 +121,26 @@ export default function ComparePage() {
     setError(null);
     try {
       const [baseline, ...rest] = selected;
-      await api.compare(baseline, rest);
-      setData(generateDemoData(selected));
+      const result = await api.compare(baseline, rest);
+      // Build trajectory from run results if available, otherwise use comparison deltas
+      const comparisonData: ComparisonData = {
+        trajectory: generateDemoData(selected).trajectory, // TODO: build from real trace data
+        deltas: [],
+        attribution: undefined,
+      };
+      // Extract deltas from comparison result
+      for (const [intName, comp] of Object.entries(result.comparisons ?? {})) {
+        const compDeltas = (comp as { deltas: Array<{ node_name: string; year: number; absolute_delta: number; percentage_delta: number }> }).deltas ?? [];
+        compDeltas.forEach((d) => {
+          comparisonData.deltas.push({
+            node: d.node_name,
+            year: d.year,
+            absolute: d.absolute_delta,
+            percentage: d.percentage_delta,
+          });
+        });
+      }
+      setData(comparisonData);
     } catch {
       setData(generateDemoData(selected));
     } finally {
