@@ -159,19 +159,17 @@ class TestAddNewVehicles:
             actual_frac = pt_n / n_new_total
             assert abs(actual_frac - expected_frac) < 0.01
 
-    def test_new_count_equals_renewal_rate(self, simple_fleet, default_proportions):
-        rate = 0.05
-        result = add_new_vehicles(simple_fleet, default_proportions, renewal_rate=rate)
-        expected_new = simple_fleet["n"].sum() * rate
+    def test_new_count_equals_n_new(self, simple_fleet, default_proportions):
+        n_new = 500.0
+        result = add_new_vehicles(simple_fleet, default_proportions, n_new=n_new)
         actual_new = result["n"].sum() - simple_fleet["n"].sum()
-        assert abs(actual_new - expected_new) < 0.01
+        assert abs(actual_new - n_new) < 0.01
 
-    def test_custom_renewal_rate(self, simple_fleet, default_proportions):
-        rate = 0.10
-        result = add_new_vehicles(simple_fleet, default_proportions, renewal_rate=rate)
-        expected_new = simple_fleet["n"].sum() * rate
+    def test_custom_n_new(self, simple_fleet, default_proportions):
+        n_new = 2000.0
+        result = add_new_vehicles(simple_fleet, default_proportions, n_new=n_new)
         actual_new = result["n"].sum() - simple_fleet["n"].sum()
-        assert abs(actual_new - expected_new) < 0.01
+        assert abs(actual_new - n_new) < 0.01
 
     def test_has_both_vmt_buckets(self, simple_fleet, default_proportions):
         result = add_new_vehicles(simple_fleet, default_proportions)
@@ -383,8 +381,9 @@ class TestMacroFleetLinkage:
     def test_preference_shift_increases_bev_share(self, simple_fleet, survival_curves, vmt_table):
         from carbonsight.domain.fleet_nodes import compute_adjusted_new_entry
         props = {"icev": 0.82, "hev": 0.09, "phev": 0.02, "bev": 0.07}
-        result_normal = compute_adjusted_new_entry(simple_fleet, props, 0.05, 1.0)
-        result_shifted = compute_adjusted_new_entry(simple_fleet, props, 0.05, 1.5)
+        n_new = 1000.0
+        result_normal = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.0)
+        result_shifted = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.5)
         bev_normal = result_normal[result_normal["powertrain"] == "bev"]["n"].sum()
         bev_shifted = result_shifted[result_shifted["powertrain"] == "bev"]["n"].sum()
         assert bev_shifted > bev_normal
@@ -401,7 +400,7 @@ class TestMacroFleetLinkage:
             "batt_kwh": [0.0, 60.0],
         })
         props = {"icev": 0.80, "bev": 0.20}
-        result = compute_adjusted_new_entry(fleet, props, 0.10, 2.0)
+        result = compute_adjusted_new_entry(fleet, props, 1000.0, 0.0, 0, 2.0)
         new_vehicles = result[result["age"] == 0]
         total_new = new_vehicles["n"].sum()
         # Total new vehicles should match renewal rate regardless of shift

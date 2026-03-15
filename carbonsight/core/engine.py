@@ -26,7 +26,8 @@ class SimulationConfig:
 
     start_year: int = 2024
     num_years: int = 10
-    renewal_rate: float = 0.05
+    annual_sales_volume: float = 15_500_000
+    sales_growth_rate: float = 0.0
     execution_mode: ExecutionMode = ExecutionMode.DETERMINISTIC
     uq_samples: int = 200  # For UQ mode: number of Monte Carlo samples
 

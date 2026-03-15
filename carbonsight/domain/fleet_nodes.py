@@ -10,6 +10,7 @@ import pandas as pd
 
 from carbonsight.core.node import Assumption, DataSource, Node, NodeType
 from carbonsight.domain.fleet_dynamics import (
+    DEFAULT_ANNUAL_SALES_VOLUME,
     add_new_vehicles,
     age_fleet,
     apply_scrappage,
@@ -43,10 +44,13 @@ def compute_scrapped_vehicles(
 def compute_post_new_entry(
     post_scrappage: pd.DataFrame,
     powertrain_proportions: dict,
-    renewal_rate: float,
+    annual_sales_volume: float,
+    sales_growth_rate: float,
+    year_index: int,
 ) -> pd.DataFrame:
     """DAG compute: add new vehicles to the fleet."""
-    return add_new_vehicles(post_scrappage, powertrain_proportions, renewal_rate)
+    n_new = annual_sales_volume * (1 + sales_growth_rate) ** year_index
+    return add_new_vehicles(post_scrappage, powertrain_proportions, n_new)
 
 
 def compute_post_vmt_assignment(
@@ -73,7 +77,9 @@ def compute_post_used_market_adjusted(
 def compute_adjusted_new_entry(
     post_scrappage: pd.DataFrame,
     powertrain_proportions: dict,
-    renewal_rate: float,
+    annual_sales_volume: float,
+    sales_growth_rate: float,
+    year_index: int,
     powertrain_preference_shift: float,
 ) -> pd.DataFrame:
     """DAG compute: add new vehicles with macro-adjusted powertrain mix.
@@ -94,7 +100,8 @@ def compute_adjusted_new_entry(
         total = sum(adjusted.values())
         if total > 0:
             adjusted = {k: v / total for k, v in adjusted.items()}
-    return add_new_vehicles(post_scrappage, adjusted, renewal_rate)
+    n_new = annual_sales_volume * (1 + sales_growth_rate) ** year_index
+    return add_new_vehicles(post_scrappage, adjusted, n_new)
 
 
 def compute_adjusted_vmt(
@@ -120,7 +127,8 @@ def create_fleet_dynamics_nodes(
     survival_curves: pd.DataFrame,
     vmt_by_age: pd.DataFrame,
     powertrain_proportions: dict[str, float] | None = None,
-    renewal_rate: float = 0.05,
+    annual_sales_volume: float = DEFAULT_ANNUAL_SALES_VOLUME,
+    sales_growth_rate: float = 0.0,
     reshuffle_probability: float = 0.15,
 ) -> list[Node]:
     """Create all fleet dynamics DAG nodes.
@@ -130,7 +138,8 @@ def create_fleet_dynamics_nodes(
         survival_curves: Survival curve DataFrame.
         vmt_by_age: VMT-by-age DataFrame.
         powertrain_proportions: New vehicle powertrain mix.
-        renewal_rate: Fleet renewal rate.
+        annual_sales_volume: New vehicles sold per year (absolute count).
+        sales_growth_rate: Annual compound growth rate for sales volume.
         reshuffle_probability: Used car market reshuffle fraction.
 
     Returns:
@@ -182,13 +191,26 @@ def create_fleet_dynamics_nodes(
             tags=["fleet", "input", "adjustable"],
         ),
         Node(
-            name="renewal_rate",
+            name="annual_sales_volume",
             node_type=NodeType.SCALAR,
-            value=renewal_rate,
+            value=annual_sales_volume,
             assumptions=[
                 Assumption(
-                    description="5% annual fleet renewal rate",
-                    rationale="Historically ~17M new vehicles sold per year out of ~280M fleet",
+                    description="15.5M new vehicles sold per year",
+                    rationale="2019-2024 US average (~15.3M); exogenous to fleet size",
+                    confidence="medium",
+                )
+            ],
+            tags=["fleet", "input", "adjustable"],
+        ),
+        Node(
+            name="sales_growth_rate",
+            node_type=NodeType.SCALAR,
+            value=sales_growth_rate,
+            assumptions=[
+                Assumption(
+                    description="0% annual sales growth rate (default)",
+                    rationale="Neutral baseline; 0.3-0.5% matches historical trends",
                     confidence="medium",
                 )
             ],
@@ -206,6 +228,12 @@ def create_fleet_dynamics_nodes(
                 )
             ],
             tags=["fleet", "input", "adjustable"],
+        ),
+        Node(
+            name="year_index",
+            node_type=NodeType.SCALAR,
+            value=0,
+            tags=["fleet", "input"],
         ),
         # Compute nodes
         Node(

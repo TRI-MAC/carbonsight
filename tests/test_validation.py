@@ -87,7 +87,7 @@ def _get_baseline_result():
 class TestRegressionVsEkiden:
     """Compare CarbonSight baseline against Ekiden v1 output."""
 
-    @pytest.mark.xfail(reason="CarbonSight ~5.4% below Ekiden v1 at year 0 due to temporal feedback loop refactoring; investigating")
+    @pytest.mark.xfail(reason="CarbonSight ~4.4% below Ekiden v1 at year 0 (passes) but diverges to ~44% by year 9 due to per-vehicle emission differences compounding over time")
     def test_total_ghg_trajectory(self):
         result = _get_baseline_result()
         for idx, yr in enumerate(result.year_results):
@@ -134,7 +134,6 @@ class TestRegressionVsEkiden:
                 f"(tolerance={REGRESSION_POWERTRAIN_TOLERANCE})"
             )
 
-    @pytest.mark.xfail(reason="Fleet shrinks ~4.3% faster than Ekiden v1 by year 7 due to temporal feedback loop; investigating")
     def test_fleet_size_trajectory(self):
         result = _get_baseline_result()
         for idx, yr in enumerate(result.year_results):

@@ -36,12 +36,12 @@ class TestTimeSteppingBasics:
         g = SimulationGraph()
         g.add_node(_make_input("x", 1.0))
 
-        config = SimulationConfig(start_year=2020, num_years=5, renewal_rate=0.03)
+        config = SimulationConfig(start_year=2020, num_years=5, annual_sales_volume=14_000_000)
         engine = SimulationEngine(g, config)
         result = engine.run()
 
         assert result.years == [2020, 2021, 2022, 2023, 2024]
-        assert result.config.renewal_rate == 0.03
+        assert result.config.annual_sales_volume == 14_000_000
 
     def test_outputs_for_year(self):
         g = SimulationGraph()

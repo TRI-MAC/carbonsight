@@ -11,7 +11,7 @@ import pandas as pd
 
 
 MAX_VEHICLE_AGE = 50
-DEFAULT_RENEWAL_RATE = 0.05
+DEFAULT_ANNUAL_SALES_VOLUME = 15_500_000
 DEFAULT_RESHUFFLE_PROB = 0.15
 
 
@@ -70,23 +70,21 @@ def apply_scrappage(
 def add_new_vehicles(
     fleet: pd.DataFrame,
     powertrain_proportions: dict[str, float],
-    renewal_rate: float = DEFAULT_RENEWAL_RATE,
+    n_new: float = 15_500_000.0,
     new_vehicle_attrs: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
-    """Add new age-0 vehicles to the fleet based on renewal rate and powertrain mix.
+    """Add new age-0 vehicles to the fleet based on absolute sales count and powertrain mix.
 
     Args:
         fleet: Current fleet DataFrame.
         powertrain_proportions: Dict mapping powertrain -> fraction (must sum to ~1).
-        renewal_rate: Fraction of fleet size to add as new vehicles.
+        n_new: Total number of new vehicles to add.
         new_vehicle_attrs: Optional DataFrame with powertrain-specific attributes
             (mpg, mpge, batt_kwh) for new vehicles. If None, uses fleet age-0 averages.
 
     Returns:
         Fleet with new vehicles appended.
     """
-    total_fleet = fleet["n"].sum()
-    n_new = total_fleet * renewal_rate
 
     new_rows = []
     for powertrain, proportion in powertrain_proportions.items():
@@ -275,7 +273,7 @@ def step_fleet_one_year(
     survival_curves: pd.DataFrame,
     vmt_table: pd.DataFrame,
     powertrain_proportions: dict[str, float],
-    renewal_rate: float = DEFAULT_RENEWAL_RATE,
+    n_new: float = DEFAULT_ANNUAL_SALES_VOLUME,
     reshuffle_prob: float = DEFAULT_RESHUFFLE_PROB,
     new_vehicle_attrs: pd.DataFrame | None = None,
 ) -> tuple[pd.DataFrame, pd.DataFrame, dict]:
@@ -305,7 +303,7 @@ def step_fleet_one_year(
 
     # 3. Add new vehicles
     fleet = add_new_vehicles(
-        fleet, powertrain_proportions, renewal_rate, new_vehicle_attrs
+        fleet, powertrain_proportions, n_new, new_vehicle_attrs
     )
 
     # 4. Assign VMT by age
