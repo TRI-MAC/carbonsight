@@ -87,7 +87,7 @@ def _get_baseline_result():
 class TestRegressionVsEkiden:
     """Compare CarbonSight baseline against Ekiden v1 output."""
 
-    @pytest.mark.xfail(reason="CarbonSight ~4.4% below Ekiden v1 at year 0 (passes) but diverges to ~44% by year 9 due to per-vehicle emission differences compounding over time")
+    @pytest.mark.xfail(reason="CarbonSight ~2.2% above Ekiden v1 at year 0 (passes) but diverges to ~16.5% by year 9 due to different fleet turnover rates (15.5M vs 14.56M new vehicles/yr)")
     def test_total_ghg_trajectory(self):
         result = _get_baseline_result()
         for idx, yr in enumerate(result.year_results):

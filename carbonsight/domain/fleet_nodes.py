@@ -47,10 +47,11 @@ def compute_post_new_entry(
     annual_sales_volume: float,
     sales_growth_rate: float,
     year_index: int,
+    new_vehicle_attrs: pd.DataFrame,
 ) -> pd.DataFrame:
     """DAG compute: add new vehicles to the fleet."""
     n_new = annual_sales_volume * (1 + sales_growth_rate) ** year_index
-    return add_new_vehicles(post_scrappage, powertrain_proportions, n_new)
+    return add_new_vehicles(post_scrappage, powertrain_proportions, n_new, new_vehicle_attrs)
 
 
 def compute_post_vmt_assignment(
@@ -81,6 +82,7 @@ def compute_adjusted_new_entry(
     sales_growth_rate: float,
     year_index: int,
     powertrain_preference_shift: float,
+    new_vehicle_attrs: pd.DataFrame,
 ) -> pd.DataFrame:
     """DAG compute: add new vehicles with macro-adjusted powertrain mix.
 
@@ -101,7 +103,7 @@ def compute_adjusted_new_entry(
         if total > 0:
             adjusted = {k: v / total for k, v in adjusted.items()}
     n_new = annual_sales_volume * (1 + sales_growth_rate) ** year_index
-    return add_new_vehicles(post_scrappage, adjusted, n_new)
+    return add_new_vehicles(post_scrappage, adjusted, n_new, new_vehicle_attrs)
 
 
 def compute_adjusted_vmt(
@@ -147,6 +149,15 @@ def create_fleet_dynamics_nodes(
     """
     if powertrain_proportions is None:
         powertrain_proportions = {"icev": 0.82, "hev": 0.09, "phev": 0.02, "bev": 0.07}
+
+    # Extract age-0 vehicle attributes (mpg, mpge, batt_kwh) before aging
+    # so new vehicles each year inherit representative powertrain characteristics
+    age0 = fleet_inventory[fleet_inventory["age"] == 0]
+    attr_cols = ["powertrain", "mpg", "mpge", "batt_kwh"]
+    attr_cols = [c for c in attr_cols if c in age0.columns]
+    if "ev_range" in age0.columns:
+        attr_cols.append("ev_range")
+    new_vehicle_attrs = age0[attr_cols].groupby("powertrain").first().reset_index()
 
     nodes = [
         # Input nodes
@@ -228,6 +239,12 @@ def create_fleet_dynamics_nodes(
                 )
             ],
             tags=["fleet", "input", "adjustable"],
+        ),
+        Node(
+            name="new_vehicle_attrs",
+            node_type=NodeType.DATAFRAME,
+            value=new_vehicle_attrs,
+            tags=["fleet", "input"],
         ),
         Node(
             name="year_index",

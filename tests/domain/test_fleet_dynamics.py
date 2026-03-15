@@ -382,8 +382,9 @@ class TestMacroFleetLinkage:
         from carbonsight.domain.fleet_nodes import compute_adjusted_new_entry
         props = {"icev": 0.82, "hev": 0.09, "phev": 0.02, "bev": 0.07}
         n_new = 1000.0
-        result_normal = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.0)
-        result_shifted = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.5)
+        attrs = simple_fleet[simple_fleet["age"] == 0][["powertrain", "mpg", "mpge", "batt_kwh"]].groupby("powertrain").first().reset_index()
+        result_normal = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.0, attrs)
+        result_shifted = compute_adjusted_new_entry(simple_fleet, props, n_new, 0.0, 0, 1.5, attrs)
         bev_normal = result_normal[result_normal["powertrain"] == "bev"]["n"].sum()
         bev_shifted = result_shifted[result_shifted["powertrain"] == "bev"]["n"].sum()
         assert bev_shifted > bev_normal
@@ -400,7 +401,8 @@ class TestMacroFleetLinkage:
             "batt_kwh": [0.0, 60.0],
         })
         props = {"icev": 0.80, "bev": 0.20}
-        result = compute_adjusted_new_entry(fleet, props, 1000.0, 0.0, 0, 2.0)
+        attrs = fleet[["powertrain", "mpg", "mpge", "batt_kwh"]].groupby("powertrain").first().reset_index()
+        result = compute_adjusted_new_entry(fleet, props, 1000.0, 0.0, 0, 2.0, attrs)
         new_vehicles = result[result["age"] == 0]
         total_new = new_vehicles["n"].sum()
         # Total new vehicles should match renewal rate regardless of shift
