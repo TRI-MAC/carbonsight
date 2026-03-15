@@ -23,4 +23,4 @@
 - [x] 4.2 Verify fleet does not shrink over 10-year baseline (year 9 >= year 0)
 - [x] 4.3 Update xfail markers in `test_validation.py` if regression alignment improves
 - [x] 4.4 Regenerate `docs/validation-report.md` and review updated deltas
-- [ ] 4.5 Commit all changes
+- [x] 4.5 Commit all changes
