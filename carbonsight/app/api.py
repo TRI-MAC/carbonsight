@@ -164,6 +164,127 @@ def list_interventions():
 # --- Dashboard ---
 
 _dashboard_cache: dict[str, Any] | None = None
+_demo_cache: dict[str, Any] | None = None
+
+
+def seed_demo_scenarios():
+    """Create pre-configured demo scenarios in the store."""
+    if "baseline" not in scenario_store.list():
+        scenario_store.create(Scenario(
+            name="baseline",
+            overrides={},
+            metadata={"description": "Default baseline scenario"},
+        ))
+    if "ev-grid-intervention" not in scenario_store.list():
+        scenario_store.create(Scenario(
+            name="ev-grid-intervention",
+            overrides={},
+            metadata={"description": "EV subsidy + grid decarbonization"},
+            interventions=[
+                InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}}),
+                InterventionSpec(type="grid_decarbonization", params={
+                    "trajectory": {str(2024 + i): 0.369 * (1 - 0.05 * i) for i in range(10)},
+                }),
+            ],
+        ))
+
+
+@app.get("/demo")
+def get_demo():
+    """Run curated baseline + intervention and return combined comparison data."""
+    global _demo_cache
+    if _demo_cache is not None:
+        return _demo_cache
+
+    graph = get_graph()
+    config = SimulationConfig(
+        start_year=2024,
+        num_years=10,
+        execution_mode=ExecutionMode.DETERMINISTIC,
+    )
+
+    # Run baseline
+    engine_b = SimulationEngine(graph, config)
+    baseline_result = engine_b.run(mode=ExecutionMode.DETERMINISTIC)
+
+    # Run intervention: EV subsidy (15% BEV shift) + grid decarbonization (~50% over 10 years)
+    intervention_overrides = {"powertrain_preference_shift": 2.14}  # shifts 7% BEV -> ~15%
+    grid_trajectory = {str(2024 + i): 0.369 * (1 - 0.05 * i) for i in range(10)}
+    year_overrides = {}
+    for i in range(10):
+        yr = 2024 + i
+        year_overrides[yr] = {"grid_ghg_per_kwh": grid_trajectory[str(yr)]}
+
+    engine_i = SimulationEngine(graph, config)
+    intervention_result = engine_i.run(
+        overrides=intervention_overrides,
+        mode=ExecutionMode.DETERMINISTIC,
+        year_overrides=year_overrides,
+    )
+
+    def _extract_trajectory(result):
+        trajectory = []
+        composition = []
+        for yr in result.year_results:
+            te = yr.outputs.get("total_emissions", {})
+            if isinstance(te, dict):
+                trajectory.append({
+                    "year": yr.year,
+                    "ghg": round(te.get("total_ghg", 0) / 1e9, 2),
+                    "production": round(te.get("production_ghg", 0) / 1e9, 2),
+                    "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
+                    "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
+                })
+            fs = yr.outputs.get("fleet_snapshot", {})
+            if isinstance(fs, dict):
+                total = fs.get("total_vehicles", 1)
+                by_pt = fs.get("by_powertrain", {})
+                if isinstance(by_pt, dict) and isinstance(total, (int, float)) and total > 0:
+                    composition.append({
+                        "year": yr.year,
+                        "total_vehicles": round(float(total)),
+                        "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
+                        "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
+                        "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
+                        "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
+                    })
+        return trajectory, composition
+
+    b_traj, b_comp = _extract_trajectory(baseline_result)
+    i_traj, i_comp = _extract_trajectory(intervention_result)
+
+    # Compute deltas
+    deltas = []
+    cumulative_avoided = 0.0
+    for bt, it in zip(b_traj, i_traj):
+        diff = it["ghg"] - bt["ghg"]
+        pct = (diff / bt["ghg"] * 100) if bt["ghg"] != 0 else 0
+        cumulative_avoided += abs(diff)
+        deltas.append({
+            "year": bt["year"],
+            "baseline_ghg": bt["ghg"],
+            "intervention_ghg": it["ghg"],
+            "absolute_delta": round(diff, 2),
+            "percentage_delta": round(pct, 2),
+        })
+
+    _demo_cache = {
+        "baseline": {"trajectory": b_traj, "composition": b_comp},
+        "intervention": {"trajectory": i_traj, "composition": i_comp},
+        "deltas": deltas,
+        "cumulative_avoided_mt": round(cumulative_avoided, 2),
+        "intervention_description": {
+            "name": "EV Subsidy + Grid Decarbonization",
+            "components": [
+                {"type": "ev_subsidy", "description": "15% BEV proportion shift in new vehicle sales"},
+                {"type": "grid_decarbonization", "description": "Grid carbon intensity declining ~50% by 2033"},
+            ],
+        },
+        "wall_clock_seconds": round(
+            baseline_result.wall_clock_seconds + intervention_result.wall_clock_seconds, 2
+        ),
+    }
+    return _demo_cache
 
 
 @app.get("/dashboard")

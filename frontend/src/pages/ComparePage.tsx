@@ -130,7 +130,17 @@ export default function ComparePage() {
       };
       // Extract deltas from comparison result
       for (const [intName, comp] of Object.entries(result.comparisons ?? {})) {
-        const compDeltas = (comp as { deltas: Array<{ node_name: string; year: number; absolute_delta: number; percentage_delta: number }> }).deltas ?? [];
+        const compDeltas =
+          (
+            comp as {
+              deltas: Array<{
+                node_name: string;
+                year: number;
+                absolute_delta: number;
+                percentage_delta: number;
+              }>;
+            }
+          ).deltas ?? [];
         compDeltas.forEach((d) => {
           comparisonData.deltas.push({
             node: d.node_name,

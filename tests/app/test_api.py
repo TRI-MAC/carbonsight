@@ -3,7 +3,8 @@
 import pytest
 from fastapi.testclient import TestClient
 
-from carbonsight.app.api import app, scenario_store, set_graph, _results_store
+import carbonsight.app.api as api_module
+from carbonsight.app.api import app, scenario_store, set_graph, _results_store, seed_demo_scenarios
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.core.node import Node, NodeType
 
@@ -13,6 +14,8 @@ def reset_state():
     """Reset API state between tests."""
     scenario_store._scenarios.clear()
     _results_store.clear()
+    api_module._dashboard_cache = None
+    api_module._demo_cache = None
 
     # Set up a simple graph for testing
     graph = SimulationGraph()
@@ -247,6 +250,66 @@ class TestScenarioWithInterventions:
         })
         assert response.status_code == 400
         assert "Unknown intervention type" in response.json()["detail"]
+
+
+class TestDemo:
+    @pytest.fixture(autouse=True)
+    def _full_graph(self):
+        """Demo endpoint requires the full simulation graph."""
+        from carbonsight.core.graph import SimulationGraph
+        from carbonsight.data.loaders import load_fleet_inventory, load_survival_curves, load_vmt_by_age
+        from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
+        from carbonsight.domain.emissions_nodes import create_emissions_nodes
+        from carbonsight.domain.macro_drivers import create_macro_driver_nodes
+
+        fleet = load_fleet_inventory()
+        survival = load_survival_curves()
+        vmt = load_vmt_by_age()
+        graph = SimulationGraph()
+        for n in create_fleet_dynamics_nodes(fleet, survival, vmt):
+            graph.add_node(n)
+        for n in create_emissions_nodes():
+            graph.add_node(n)
+        for n in create_macro_driver_nodes():
+            graph.add_node(n)
+        graph.validate()
+        set_graph(graph)
+
+    def test_demo_endpoint(self, client):
+        response = client.get("/demo")
+        assert response.status_code == 200
+        data = response.json()
+        assert "baseline" in data
+        assert "intervention" in data
+        assert "deltas" in data
+        assert "cumulative_avoided_mt" in data
+        assert "intervention_description" in data
+        assert "wall_clock_seconds" in data
+        assert len(data["baseline"]["trajectory"]) == 10
+        assert len(data["intervention"]["trajectory"]) == 10
+        assert len(data["deltas"]) == 10
+
+    def test_demo_cached(self, client):
+        r1 = client.get("/demo")
+        r2 = client.get("/demo")
+        assert r1.json() == r2.json()
+
+
+class TestDemoSeeding:
+    def test_seeded_scenarios_appear(self, client):
+        seed_demo_scenarios()
+        response = client.get("/scenarios")
+        names = [s["name"] for s in response.json()]
+        assert "baseline" in names
+        assert "ev-grid-intervention" in names
+
+    def test_seeding_idempotent(self, client):
+        seed_demo_scenarios()
+        seed_demo_scenarios()
+        response = client.get("/scenarios")
+        names = [s["name"] for s in response.json()]
+        assert names.count("baseline") == 1
+        assert names.count("ev-grid-intervention") == 1
 
 
 class TestSensitivity:

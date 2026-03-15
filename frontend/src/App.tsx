@@ -5,6 +5,7 @@ import GraphPage from "./pages/GraphPage";
 import ScenariosPage from "./pages/ScenariosPage";
 import ComparePage from "./pages/ComparePage";
 import SensitivityPage from "./pages/SensitivityPage";
+import DemoPage from "./pages/DemoPage";
 
 export default function App() {
   return (
@@ -16,6 +17,7 @@ export default function App() {
           <Route path="scenarios" element={<ScenariosPage />} />
           <Route path="compare" element={<ComparePage />} />
           <Route path="sensitivity" element={<SensitivityPage />} />
+          <Route path="demo" element={<DemoPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

@@ -106,12 +106,22 @@ export default function SensitivityPage() {
     api
       .getSensitivity(selectedScenario)
       .then((result) => {
-        const drivers = (result as { drivers?: Array<{ input_node: string; first_order_index: number; total_order_index: number }> }).drivers;
+        const drivers = (
+          result as {
+            drivers?: Array<{
+              input_node: string;
+              first_order_index: number;
+              total_order_index: number;
+            }>;
+          }
+        ).drivers;
         if (drivers && drivers.length > 0) {
           setSensitivityData(
             drivers.map((d) => ({
               parameter: d.input_node,
-              displayName: d.input_node.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()),
+              displayName: d.input_node
+                .replace(/_/g, " ")
+                .replace(/\b\w/g, (c) => c.toUpperCase()),
               firstOrder: d.first_order_index,
               totalOrder: d.total_order_index,
             })),
@@ -131,7 +141,9 @@ export default function SensitivityPage() {
       .catch((err) => {
         const errStr = String(err);
         if (errStr.includes("UQ mode")) {
-          setErrorMsg("Sensitivity analysis requires a UQ mode run. Re-run the scenario in UQ mode.");
+          setErrorMsg(
+            "Sensitivity analysis requires a UQ mode run. Re-run the scenario in UQ mode.",
+          );
           setSensitivityData([]);
         } else {
           setSensitivityData(DEMO_SENSITIVITY);

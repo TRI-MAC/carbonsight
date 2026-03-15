@@ -34,34 +34,98 @@ interface ScenarioWithStatus extends ScenarioConfig {
   error?: string;
 }
 
-const FALLBACK_CATEGORIES: Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> = {
+const FALLBACK_CATEGORIES: Record<
+  string,
+  Array<{
+    name: string;
+    label: string;
+    unit: string;
+    min?: number;
+    max?: number;
+  }>
+> = {
   Policy: [
     { name: "carbon_pricing", label: "Carbon pricing", unit: "$/ton", min: 0 },
     { name: "ev_subsidy", label: "EV subsidy", unit: "$", min: 0 },
-    { name: "scrappage_program", label: "Scrappage program", unit: "factor", min: 1, max: 5 },
+    {
+      name: "scrappage_program",
+      label: "Scrappage program",
+      unit: "factor",
+      min: 1,
+      max: 5,
+    },
   ],
   Technology: [
-    { name: "battery_cost_reduction", label: "Battery cost reduction", unit: "%", min: 0, max: 100 },
+    {
+      name: "battery_cost_reduction",
+      label: "Battery cost reduction",
+      unit: "%",
+      min: 0,
+      max: 100,
+    },
   ],
   Behavioral: [
-    { name: "vmt_reduction", label: "VMT reduction", unit: "factor", min: 0.5, max: 1.0 },
-    { name: "phev_charging_improvement", label: "PHEV charging improvement", unit: "factor", min: 0.5, max: 1.0 },
+    {
+      name: "vmt_reduction",
+      label: "VMT reduction",
+      unit: "factor",
+      min: 0.5,
+      max: 1.0,
+    },
+    {
+      name: "phev_charging_improvement",
+      label: "PHEV charging improvement",
+      unit: "factor",
+      min: 0.5,
+      max: 1.0,
+    },
   ],
   "Grid/Energy": [
-    { name: "grid_decarbonization", label: "Grid decarbonization", unit: "trajectory", min: 0, max: 1 },
+    {
+      name: "grid_decarbonization",
+      label: "Grid decarbonization",
+      unit: "trajectory",
+      min: 0,
+      max: 1,
+    },
   ],
 };
 
-function catalogToCategories(catalog: CatalogItem[]): Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> {
-  const categories: Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>> = {};
+function catalogToCategories(catalog: CatalogItem[]): Record<
+  string,
+  Array<{
+    name: string;
+    label: string;
+    unit: string;
+    min?: number;
+    max?: number;
+  }>
+> {
+  const categories: Record<
+    string,
+    Array<{
+      name: string;
+      label: string;
+      unit: string;
+      min?: number;
+      max?: number;
+    }>
+  > = {};
   for (const item of catalog) {
-    const cat = item.category.replace(/_/g, "/").replace(/\b\w/g, (c) => c.toUpperCase());
+    const cat = item.category
+      .replace(/_/g, "/")
+      .replace(/\b\w/g, (c) => c.toUpperCase());
     if (!categories[cat]) categories[cat] = [];
     const mainParam = item.params[0];
     categories[cat].push({
       name: item.type,
       label: item.description,
-      unit: mainParam?.type === "float" ? (mainParam.name.includes("factor") ? "factor" : "value") : "value",
+      unit:
+        mainParam?.type === "float"
+          ? mainParam.name.includes("factor")
+            ? "factor"
+            : "value"
+          : "value",
       min: mainParam?.min ?? undefined,
       max: mainParam?.max ?? undefined,
     });
@@ -77,7 +141,16 @@ export default function ScenariosPage() {
   const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [interventionCategories, setInterventionCategories] = useState<
-    Record<string, Array<{ name: string; label: string; unit: string; min?: number; max?: number }>>
+    Record<
+      string,
+      Array<{
+        name: string;
+        label: string;
+        unit: string;
+        min?: number;
+        max?: number;
+      }>
+    >
   >(FALLBACK_CATEGORIES);
 
   // Form state
@@ -692,109 +765,111 @@ export default function ScenariosPage() {
                       marginBottom: 12,
                     }}
                   >
-                    {(interventionCategories[selectedCategory] ?? []).map((intervention) => {
-                      const isActive = interventions[intervention.name];
-                      return (
-                        <div
-                          key={intervention.name}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                            padding: "8px 12px",
-                            background: isActive
-                              ? "var(--bg-elevated)"
-                              : "var(--bg-primary)",
-                            border: "1px solid var(--border-default)",
-                            borderRadius: "var(--radius-md)",
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={!!isActive}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                handleInterventionChange(
-                                  selectedCategory,
-                                  intervention.name,
-                                  0,
-                                  intervention.unit,
-                                  intervention.min,
-                                  intervention.max,
-                                );
-                              } else {
-                                handleRemoveIntervention(intervention.name);
-                              }
-                            }}
-                            style={{ cursor: "pointer" }}
-                          />
-                          <label
+                    {(interventionCategories[selectedCategory] ?? []).map(
+                      (intervention) => {
+                        const isActive = interventions[intervention.name];
+                        return (
+                          <div
+                            key={intervention.name}
                             style={{
-                              flex: 1,
-                              fontSize: 13,
-                              color: "var(--text-primary)",
-                              cursor: "pointer",
-                            }}
-                            onClick={() => {
-                              if (isActive) {
-                                handleRemoveIntervention(intervention.name);
-                              } else {
-                                handleInterventionChange(
-                                  selectedCategory,
-                                  intervention.name,
-                                  0,
-                                  intervention.unit,
-                                  intervention.min,
-                                  intervention.max,
-                                );
-                              }
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 8,
+                              padding: "8px 12px",
+                              background: isActive
+                                ? "var(--bg-elevated)"
+                                : "var(--bg-primary)",
+                              border: "1px solid var(--border-default)",
+                              borderRadius: "var(--radius-md)",
                             }}
                           >
-                            {intervention.label}
-                          </label>
-                          {isActive && (
-                            <>
-                              <input
-                                type="number"
-                                value={isActive.value}
-                                onChange={(e) =>
+                            <input
+                              type="checkbox"
+                              checked={!!isActive}
+                              onChange={(e) => {
+                                if (e.target.checked) {
                                   handleInterventionChange(
                                     selectedCategory,
                                     intervention.name,
-                                    Number(e.target.value),
+                                    0,
                                     intervention.unit,
                                     intervention.min,
                                     intervention.max,
-                                  )
+                                  );
+                                } else {
+                                  handleRemoveIntervention(intervention.name);
                                 }
-                                min={intervention.min}
-                                max={intervention.max}
-                                step={intervention.unit === "%" ? 1 : 0.1}
-                                style={{
-                                  width: 80,
-                                  padding: "4px 8px",
-                                  background: "var(--bg-primary)",
-                                  border: "1px solid var(--border-default)",
-                                  borderRadius: "var(--radius-md)",
-                                  color: "var(--text-primary)",
-                                  fontSize: 13,
-                                  fontFamily: "var(--font-mono)",
-                                }}
-                              />
-                              <span
-                                style={{
-                                  fontSize: 12,
-                                  color: "var(--text-muted)",
-                                  minWidth: 40,
-                                }}
-                              >
-                                {intervention.unit}
-                              </span>
-                            </>
-                          )}
-                        </div>
-                      );
-                    })}
+                              }}
+                              style={{ cursor: "pointer" }}
+                            />
+                            <label
+                              style={{
+                                flex: 1,
+                                fontSize: 13,
+                                color: "var(--text-primary)",
+                                cursor: "pointer",
+                              }}
+                              onClick={() => {
+                                if (isActive) {
+                                  handleRemoveIntervention(intervention.name);
+                                } else {
+                                  handleInterventionChange(
+                                    selectedCategory,
+                                    intervention.name,
+                                    0,
+                                    intervention.unit,
+                                    intervention.min,
+                                    intervention.max,
+                                  );
+                                }
+                              }}
+                            >
+                              {intervention.label}
+                            </label>
+                            {isActive && (
+                              <>
+                                <input
+                                  type="number"
+                                  value={isActive.value}
+                                  onChange={(e) =>
+                                    handleInterventionChange(
+                                      selectedCategory,
+                                      intervention.name,
+                                      Number(e.target.value),
+                                      intervention.unit,
+                                      intervention.min,
+                                      intervention.max,
+                                    )
+                                  }
+                                  min={intervention.min}
+                                  max={intervention.max}
+                                  step={intervention.unit === "%" ? 1 : 0.1}
+                                  style={{
+                                    width: 80,
+                                    padding: "4px 8px",
+                                    background: "var(--bg-primary)",
+                                    border: "1px solid var(--border-default)",
+                                    borderRadius: "var(--radius-md)",
+                                    color: "var(--text-primary)",
+                                    fontSize: 13,
+                                    fontFamily: "var(--font-mono)",
+                                  }}
+                                />
+                                <span
+                                  style={{
+                                    fontSize: 12,
+                                    color: "var(--text-muted)",
+                                    minWidth: 40,
+                                  }}
+                                >
+                                  {intervention.unit}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      },
+                    )}
                   </div>
                 </div>
 

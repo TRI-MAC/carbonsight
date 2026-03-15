@@ -6,6 +6,7 @@ const navItems = [
   { to: "/scenarios", label: "Scenarios", icon: "\u25A1" },
   { to: "/compare", label: "Compare", icon: "\u2194" },
   { to: "/sensitivity", label: "Sensitivity", icon: "\u2261" },
+  { to: "/demo", label: "Demo", icon: "\u25B6" },
 ];
 
 export default function Layout() {
