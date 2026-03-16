@@ -70,6 +70,8 @@ def create_emissions_nodes(
             name="production_body",
             node_type=NodeType.SCALAR,
             value=production_body,
+            display_name="Body Manufacturing Emissions",
+            description="CO2 emitted manufacturing a vehicle body (~4,200 kg).",
             assumptions=[
                 Assumption(
                     description="Body manufacturing emissions ~4200 kg CO2",
@@ -83,12 +85,16 @@ def create_emissions_nodes(
             name="production_ice",
             node_type=NodeType.SCALAR,
             value=production_ice,
+            display_name="ICE Powertrain Emissions",
+            description="Additional CO2 from manufacturing an internal combustion powertrain (~1,400 kg).",
             tags=["emissions", "input", "adjustable"],
         ),
         Node(
             name="production_battery_per_kwh",
             node_type=NodeType.SCALAR,
             value=production_battery_per_kwh,
+            display_name="Battery Manufacturing Emissions",
+            description="CO2 per kWh of battery capacity manufactured (~100 kg/kWh).",
             assumptions=[
                 Assumption(
                     description="Battery manufacturing ~100 kg CO2/kWh",
@@ -102,18 +108,24 @@ def create_emissions_nodes(
             name="gas_ghg_per_gallon",
             node_type=NodeType.SCALAR,
             value=gas_ghg_per_gallon,
+            display_name="Gasoline Carbon Intensity",
+            description="CO2 emitted per gallon of gasoline burned (~8.89 kg/gal).",
             tags=["emissions", "input", "adjustable"],
         ),
         Node(
             name="grid_ghg_per_kwh",
             node_type=NodeType.SCALAR,
             value=grid_ghg_per_kwh,
+            display_name="Grid Carbon Intensity",
+            description="CO2 emitted per kWh of electricity from the grid (~0.369 kg/kWh).",
             tags=["emissions", "input", "adjustable"],
         ),
         Node(
             name="disposal_per_vehicle",
             node_type=NodeType.SCALAR,
             value=disposal_per_vehicle,
+            display_name="End-of-Life Emissions per Vehicle",
+            description="CO2 from scrapping and recycling one vehicle (~2,800 kg).",
             tags=["emissions", "input", "adjustable"],
         ),
         # Compute nodes
@@ -121,24 +133,32 @@ def create_emissions_nodes(
             name="fleet_production_ghg",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_fleet_production_ghg,
+            display_name="Manufacturing Emissions",
+            description="Total emissions from producing this year's vehicles. Combines **Final Fleet** with **Body Manufacturing Emissions**, **ICE Powertrain Emissions**, and **Battery Manufacturing Emissions**.",
             tags=["emissions", "process"],
         ),
         Node(
             name="fleet_usage_ghg",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_fleet_usage_ghg,
+            display_name="Driving Emissions",
+            description="Emissions from all vehicles on the road this year. Applies **Gasoline Carbon Intensity** and **Grid Carbon Intensity** to mileage and fuel consumption from **Manufacturing Emissions**.",
             tags=["emissions", "process"],
         ),
         Node(
             name="scrapped_disposal_ghg",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_scrapped_disposal_ghg,
+            display_name="End-of-Life Emissions",
+            description="Emissions from vehicles leaving the fleet this year. Multiplies **Retired Vehicles** count by **End-of-Life Emissions per Vehicle**.",
             tags=["emissions", "process"],
         ),
         Node(
             name="total_emissions",
             node_type=NodeType.SCALAR,
             compute_fn=compute_total_emissions,
+            display_name="Total Emissions",
+            description="Sum of all lifecycle emissions for the year: **Manufacturing Emissions** + **Driving Emissions** + **End-of-Life Emissions**.",
             tags=["emissions", "output"],
         ),
     ]

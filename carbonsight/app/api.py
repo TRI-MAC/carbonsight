@@ -528,6 +528,8 @@ def list_graph_nodes():
             "upstream": node.upstream_edges,
             "temporal": node.temporal_edges,
             "tags": node.tags,
+            "display_name": node.display_name,
+            "description": node.description,
         })
     return nodes
 
@@ -547,6 +549,8 @@ def get_graph_node(name: str):
         "upstream": node.upstream_edges,
         "temporal": node.temporal_edges,
         "tags": node.tags,
+        "display_name": node.display_name,
+        "description": node.description,
     }
 
     if node.data_source:

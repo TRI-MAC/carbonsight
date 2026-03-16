@@ -24,6 +24,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: [],
     temporal: [],
     tags: ["fleet"],
+    display_name: "Fleet Inventory",
+    description:
+      "Initial US light-duty vehicle stock (~280M vehicles) by powertrain, age, and VMT bucket.",
     data_source: {
       name: "IEA Global EV Outlook 2024",
       publication_date: "2024-04-15",
@@ -45,6 +48,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: [],
     temporal: [],
     tags: ["fleet"],
+    display_name: "Survival Curves",
+    description:
+      "Age-based probability of a vehicle remaining in service. From Greene & Leard survival model.",
     data_source: {
       name: "EPA Vehicle Survival Rates",
       publication_date: "2023-11-01",
@@ -65,6 +71,8 @@ const DEMO_NODES: GraphNode[] = [
     upstream: [],
     temporal: [],
     tags: ["macro"],
+    display_name: "Oil Price",
+    description: "Crude oil price projection from EIA Short-Term Energy Outlook.",
     data_source: {
       name: "EIA Short-Term Energy Outlook",
       publication_date: "2024-01-10",
@@ -77,6 +85,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: [],
     temporal: [],
     tags: ["emissions", "macro"],
+    display_name: "Grid Carbon Intensity",
+    description:
+      "CO2 emitted per kWh of electricity from the grid.",
     data_source: {
       name: "IEA World Energy Outlook 2024",
       publication_date: "2024-10-24",
@@ -89,6 +100,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["fleet_inventory"],
     temporal: ["aged_fleet"],
     tags: ["fleet"],
+    display_name: "Aged Fleet",
+    description:
+      "All vehicles aged by one year. Reads prior year's **Fleet Inventory** and increments each vehicle's age.",
   },
   {
     name: "post_scrappage",
@@ -97,6 +111,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["aged_fleet", "survival_curves"],
     temporal: [],
     tags: ["fleet"],
+    display_name: "Surviving Fleet",
+    description:
+      "Vehicles remaining after age-based retirement. Applies **Survival Curves** to the **Aged Fleet** to probabilistically remove end-of-life vehicles.",
     assumptions: [
       {
         description: "Scrappage applied uniformly across vehicle types",
@@ -112,6 +129,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: [],
     temporal: [],
     tags: ["fleet"],
+    display_name: "New Vehicle Sales",
+    description:
+      "New vehicles entering the fleet this year by powertrain type.",
     data_source: {
       name: "BloombergNEF EV Forecast",
       publication_date: "2024-06-12",
@@ -124,6 +144,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["post_scrappage", "new_vehicles"],
     temporal: [],
     tags: ["fleet"],
+    display_name: "Fleet Composition",
+    description:
+      "Annual summary of fleet size, powertrain shares, and average age. Computed from **Surviving Fleet** and **New Vehicle Sales**.",
   },
   {
     name: "production_emissions",
@@ -132,6 +155,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["new_vehicles", "grid_intensity"],
     temporal: [],
     tags: ["emissions"],
+    display_name: "Manufacturing Emissions",
+    description:
+      "Total emissions from producing this year's vehicles. Combines **New Vehicle Sales** with **Grid Carbon Intensity**.",
   },
   {
     name: "usage_emissions",
@@ -140,6 +166,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["fleet_snapshot", "oil_price", "grid_intensity"],
     temporal: [],
     tags: ["emissions"],
+    display_name: "Driving Emissions",
+    description:
+      "Emissions from all vehicles on the road this year. Applies **Oil Price** and **Grid Carbon Intensity** to **Fleet Composition**.",
   },
   {
     name: "disposal_emissions",
@@ -148,6 +177,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["post_scrappage"],
     temporal: [],
     tags: ["emissions"],
+    display_name: "End-of-Life Emissions",
+    description:
+      "Emissions from vehicles leaving the fleet this year, derived from **Surviving Fleet** scrappage data.",
   },
   {
     name: "total_emissions",
@@ -156,6 +188,9 @@ const DEMO_NODES: GraphNode[] = [
     upstream: ["production_emissions", "usage_emissions", "disposal_emissions"],
     temporal: [],
     tags: ["emissions"],
+    display_name: "Total Emissions",
+    description:
+      "Sum of all lifecycle emissions: **Manufacturing Emissions** + **Driving Emissions** + **End-of-Life Emissions**.",
   },
 ];
 
@@ -274,7 +309,17 @@ export default function GraphPage() {
       data: {
         label: (
           <div style={{ textAlign: "center" }}>
-            <div style={{ fontWeight: "600", marginBottom: "4px" }}>
+            <div style={{ fontWeight: "600", marginBottom: "2px" }}>
+              {gn.display_name ?? gn.name}
+            </div>
+            <div
+              style={{
+                fontSize: "10px",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font-mono)",
+                marginBottom: "4px",
+              }}
+            >
               {gn.name}
             </div>
             <div
@@ -559,7 +604,21 @@ export default function GraphPage() {
       {selectedNode && (
         <div style={styles.detailPanel}>
           <div style={styles.detailHeader}>
-            <h2 style={styles.detailTitle}>{selectedNode.name}</h2>
+            <div style={{ flex: 1 }}>
+              <h2 style={styles.detailTitle}>
+                {selectedNode.display_name ?? selectedNode.name}
+              </h2>
+              <div
+                style={{
+                  fontSize: "12px",
+                  fontFamily: "var(--font-mono)",
+                  color: "var(--text-muted)",
+                  marginTop: "4px",
+                }}
+              >
+                {selectedNode.name}
+              </div>
+            </div>
             <button
               onClick={() => {
                 setSelectedNode(null);
@@ -621,6 +680,21 @@ export default function GraphPage() {
                   </span>
                 ))}
               </div>
+            </div>
+          )}
+
+          {selectedNode.description && (
+            <div style={styles.detailSection}>
+              <div style={styles.detailLabel}>Description</div>
+              <div
+                style={{ fontSize: "13px", lineHeight: "1.6" }}
+                dangerouslySetInnerHTML={{
+                  __html: selectedNode.description.replace(
+                    /\*\*(.+?)\*\*/g,
+                    '<strong style="color: var(--accent-cyan)">$1</strong>',
+                  ),
+                }}
+              />
             </div>
           )}
 

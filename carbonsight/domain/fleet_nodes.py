@@ -166,6 +166,8 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.DATAFRAME,
             value=fleet_inventory,
             initial_value=fleet_inventory,
+            display_name="Fleet Inventory",
+            description="Initial US light-duty vehicle stock (~280M vehicles) by powertrain, age, and VMT bucket. Loaded from EPA registration data.",
             data_source=DataSource(
                 name="Fleet Inventory",
                 publication_date="2024",
@@ -178,6 +180,8 @@ def create_fleet_dynamics_nodes(
             name="survival_curves",
             node_type=NodeType.DATAFRAME,
             value=survival_curves,
+            display_name="Survival Curves",
+            description="Age-based probability of a vehicle remaining in service. From Greene & Leard survival model.",
             data_source=DataSource(
                 name="Greene & Leard Survival Model",
                 publication_date="2024",
@@ -189,6 +193,8 @@ def create_fleet_dynamics_nodes(
             name="vmt_by_age",
             node_type=NodeType.DATAFRAME,
             value=vmt_by_age,
+            display_name="Mileage by Age",
+            description="Annual miles driven as a function of vehicle age. From NHTS 2017 survey data.",
             data_source=DataSource(
                 name="NHTS 2017",
                 url="vmt_by_age.csv",
@@ -199,12 +205,16 @@ def create_fleet_dynamics_nodes(
             name="powertrain_proportions",
             node_type=NodeType.SCALAR,
             value=powertrain_proportions,
+            display_name="New Vehicle Powertrain Mix",
+            description="Share of new vehicle sales by powertrain type (ICEV, HEV, PHEV, BEV).",
             tags=["fleet", "input", "adjustable"],
         ),
         Node(
             name="annual_sales_volume",
             node_type=NodeType.SCALAR,
             value=annual_sales_volume,
+            display_name="Annual New Vehicle Sales",
+            description="Total new vehicles sold per year (~15.5M default). Exogenous to fleet size.",
             assumptions=[
                 Assumption(
                     description="15.5M new vehicles sold per year",
@@ -218,6 +228,8 @@ def create_fleet_dynamics_nodes(
             name="sales_growth_rate",
             node_type=NodeType.SCALAR,
             value=sales_growth_rate,
+            display_name="Sales Growth Rate",
+            description="Annual compound growth rate applied to new vehicle sales volume.",
             assumptions=[
                 Assumption(
                     description="0% annual sales growth rate (default)",
@@ -231,6 +243,8 @@ def create_fleet_dynamics_nodes(
             name="reshuffle_probability",
             node_type=NodeType.SCALAR,
             value=reshuffle_probability,
+            display_name="Used Market Reshuffle Rate",
+            description="Fraction of fleet eligible for used car market redistribution each year (~15%).",
             assumptions=[
                 Assumption(
                     description="15% of fleet eligible for used market reshuffling",
@@ -244,12 +258,16 @@ def create_fleet_dynamics_nodes(
             name="new_vehicle_attrs",
             node_type=NodeType.DATAFRAME,
             value=new_vehicle_attrs,
+            display_name="New Vehicle Characteristics",
+            description="Fuel efficiency (MPG/MPGe) and battery size for new vehicles by powertrain. Extracted from age-0 cohort of **Fleet Inventory**.",
             tags=["fleet", "input"],
         ),
         Node(
             name="year_index",
             node_type=NodeType.SCALAR,
             value=0,
+            display_name="Simulation Year",
+            description="Current year offset from simulation start (0 = base year).",
             tags=["fleet", "input"],
         ),
         # Compute nodes
@@ -257,36 +275,48 @@ def create_fleet_dynamics_nodes(
             name="aged_fleet",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_aged_fleet,
+            display_name="Aged Fleet",
+            description="All vehicles aged by one year. Reads prior year's **Final Fleet** and increments each vehicle's age.",
             tags=["fleet", "process"],
         ),
         Node(
             name="post_scrappage",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_post_scrappage,
+            display_name="Surviving Fleet",
+            description="Vehicles remaining after age-based retirement. Applies **Survival Curves** to the **Aged Fleet** to probabilistically remove end-of-life vehicles.",
             tags=["fleet", "process"],
         ),
         Node(
             name="scrapped_vehicles",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_scrapped_vehicles,
+            display_name="Retired Vehicles",
+            description="Vehicles removed from service this year. The complement of **Surviving Fleet** — same scrappage calculation, opposite output.",
             tags=["fleet", "process"],
         ),
         Node(
             name="post_new_entry",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_adjusted_new_entry,
+            display_name="Fleet With New Sales",
+            description="Fleet after adding this year's new vehicles. Combines **Surviving Fleet** with new vehicles based on **New Vehicle Powertrain Mix**, **Annual New Vehicle Sales**, and **New Vehicle Characteristics**.",
             tags=["fleet", "process"],
         ),
         Node(
             name="post_vmt_assignment",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_post_vmt_assignment,
+            display_name="Fleet With Mileage",
+            description="Fleet after assigning annual driving distances. Applies **Mileage by Age** schedules to **Fleet With New Sales**.",
             tags=["fleet", "process"],
         ),
         Node(
             name="adjusted_vmt",
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_adjusted_vmt,
+            display_name="Mileage-Adjusted Fleet",
+            description="Fleet with macro-economically adjusted driving distances. Scales mileage from **Fleet With Mileage** by an economic adjustment factor.",
             tags=["fleet", "process"],
         ),
         Node(
@@ -294,12 +324,16 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.DATAFRAME,
             compute_fn=compute_post_used_market_adjusted,
             initial_value=fleet_inventory,
+            display_name="Final Fleet",
+            description="Year-end fleet after used car market reshuffling. Applies **Used Market Reshuffle Rate** to **Mileage-Adjusted Fleet** to redistribute vehicles across VMT buckets.",
             tags=["fleet", "process"],
         ),
         Node(
             name="fleet_snapshot",
             node_type=NodeType.SCALAR,
             compute_fn=compute_fleet_snapshot,
+            display_name="Fleet Composition",
+            description="Annual summary of fleet size, powertrain shares, and average age. Computed from the **Final Fleet**.",
             tags=["fleet", "output"],
         ),
     ]

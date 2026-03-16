@@ -63,6 +63,8 @@ class Node:
     compute_fn: Callable | None = None
     value: Any = None
     initial_value: Any = None  # Used for temporal edge resolution at year 0
+    display_name: str | None = None
+    description: str | None = None
     data_source: DataSource | None = None
     assumptions: list[Assumption] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)

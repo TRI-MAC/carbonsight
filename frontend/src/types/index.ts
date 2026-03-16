@@ -5,6 +5,8 @@ export interface GraphNode {
   upstream: string[];
   temporal: string[];
   tags: string[];
+  display_name?: string;
+  description?: string;
   data_source?: {
     name: string;
     publication_date?: string;
