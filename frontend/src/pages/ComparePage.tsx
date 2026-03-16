@@ -22,6 +22,8 @@ interface Scenario {
   name: string;
 }
 
+type RunStatus = "checking" | "ready" | "not-run";
+
 interface ComparisonData {
   trajectory: Array<Record<string, number>>;
   deltas: Array<{
@@ -99,12 +101,38 @@ export default function ComparePage() {
   const [data, setData] = useState<ComparisonData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [runStatus, setRunStatus] = useState<Record<string, RunStatus>>({});
 
   useEffect(() => {
     api
       .listScenarios()
-      .then((list) => setScenarios(list.map((s) => ({ name: s.name }))))
-      .catch(() => setScenarios(DEMO_SCENARIOS));
+      .then(async (list) => {
+        const scenarioList = list.map((s) => ({ name: s.name }));
+        setScenarios(scenarioList);
+        setDemoMode(false);
+        // Probe run status for each scenario
+        const statusMap: Record<string, RunStatus> = {};
+        for (const s of scenarioList) {
+          statusMap[s.name] = "checking";
+        }
+        setRunStatus({ ...statusMap });
+        await Promise.all(
+          scenarioList.map(async (s) => {
+            try {
+              await api.getTrace(s.name, "total_emissions");
+              statusMap[s.name] = "ready";
+            } catch {
+              statusMap[s.name] = "not-run";
+            }
+          }),
+        );
+        setRunStatus({ ...statusMap });
+      })
+      .catch(() => {
+        setScenarios(DEMO_SCENARIOS);
+        setDemoMode(true);
+      });
   }, []);
 
   const toggle = (name: string) =>
@@ -122,14 +150,53 @@ export default function ComparePage() {
     try {
       const [baseline, ...rest] = selected;
       const result = await api.compare(baseline, rest);
-      // Build trajectory from run results if available, otherwise use comparison deltas
+
+      // Fetch trace data for each selected scenario
+      const traceResults = await Promise.allSettled(
+        selected.map((name) => api.getTrace(name, "total_emissions")),
+      );
+
+      // Build trajectory from real trace data
+      const trajectory: Array<Record<string, number>> = [];
+      const failedTraces: string[] = [];
+
+      // Check for trace failures
+      traceResults.forEach((tr, i) => {
+        if (tr.status === "rejected") failedTraces.push(selected[i]);
+      });
+
+      if (failedTraces.length > 0) {
+        setError(
+          `Trace data unavailable for: ${failedTraces.join(", ")}. Run these scenarios first.`,
+        );
+        setLoading(false);
+        return;
+      }
+
+      // All traces succeeded — build chart data
+      const traces = traceResults.map(
+        (tr) =>
+          (tr as PromiseFulfilledResult<import("../types").TraceResponse>)
+            .value,
+      );
+      const years = traces[0]?.years ?? [];
+      for (let yi = 0; yi < years.length; yi++) {
+        const pt: Record<string, number> = { year: years[yi] };
+        traces.forEach((trace, si) => {
+          pt[selected[si]] = trace.values[yi] ?? 0;
+        });
+        trajectory.push(pt);
+      }
+
+      // Build comparison data
       const comparisonData: ComparisonData = {
-        trajectory: generateDemoData(selected).trajectory, // TODO: build from real trace data
+        trajectory,
         deltas: [],
         attribution: undefined,
       };
+
       // Extract deltas from comparison result
-      for (const [intName, comp] of Object.entries(result.comparisons ?? {})) {
+      for (const [, comp] of Object.entries(result.comparisons ?? {})) {
         const compDeltas =
           (
             comp as {
@@ -152,7 +219,11 @@ export default function ComparePage() {
       }
       setData(comparisonData);
     } catch {
-      setData(generateDemoData(selected));
+      if (demoMode) {
+        setData(generateDemoData(selected));
+      } else {
+        setError("Comparison failed. Is the API running?");
+      }
     } finally {
       setLoading(false);
     }
@@ -194,24 +265,52 @@ export default function ComparePage() {
             marginBottom: 16,
           }}
         >
-          {scenarios.map((s) => (
-            <label
-              key={s.name}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-                cursor: "pointer",
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selected.includes(s.name)}
-                onChange={() => toggle(s.name)}
-              />
-              <span style={{ fontSize: 14 }}>{s.name}</span>
-            </label>
-          ))}
+          {scenarios.map((s) => {
+            const status = runStatus[s.name];
+            return (
+              <label
+                key={s.name}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 8,
+                  cursor: "pointer",
+                }}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(s.name)}
+                  onChange={() => toggle(s.name)}
+                />
+                <span
+                  style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: "50%",
+                    backgroundColor:
+                      !status || status === "checking"
+                        ? "#556178"
+                        : status === "ready"
+                          ? "#34d399"
+                          : "#556178",
+                    flexShrink: 0,
+                  }}
+                />
+                <span style={{ fontSize: 14 }}>{s.name}</span>
+                {status === "not-run" && (
+                  <span
+                    style={{
+                      fontSize: 11,
+                      color: "#8b95a8",
+                      marginLeft: 4,
+                    }}
+                  >
+                    Not run
+                  </span>
+                )}
+              </label>
+            );
+          })}
         </div>
         {error && (
           <div
@@ -224,13 +323,34 @@ export default function ComparePage() {
             {error}
           </div>
         )}
-        <Button
-          variant="primary"
-          onClick={compare}
-          disabled={loading || selected.length < 2}
-        >
-          {loading ? "Comparing..." : "Compare"}
-        </Button>
+        {(() => {
+          const unrunSelected = selected.filter(
+            (n) => runStatus[n] === "not-run",
+          );
+          const hasUnrun = !demoMode && unrunSelected.length > 0;
+          return (
+            <>
+              <Button
+                variant="primary"
+                onClick={compare}
+                disabled={loading || selected.length < 2 || hasUnrun}
+              >
+                {loading ? "Comparing..." : "Compare"}
+              </Button>
+              {hasUnrun && (
+                <div
+                  style={{
+                    color: "#fbbf24",
+                    fontSize: 12,
+                    marginTop: 8,
+                  }}
+                >
+                  Run these scenarios first: {unrunSelected.join(", ")}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </Card>
 
       {data && (

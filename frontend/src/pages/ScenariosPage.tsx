@@ -19,6 +19,14 @@ interface CatalogItem {
   }>;
 }
 
+interface CatalogParam {
+  name: string;
+  type: string;
+  default: unknown;
+  min: number | null;
+  max: number | null;
+}
+
 interface InterventionValue {
   category: string;
   name: string;
@@ -26,6 +34,7 @@ interface InterventionValue {
   unit: string;
   min?: number;
   max?: number;
+  catalogParams?: CatalogParam[];
 }
 
 interface ScenarioWithStatus extends ScenarioConfig {
@@ -99,6 +108,7 @@ function catalogToCategories(catalog: CatalogItem[]): Record<
     unit: string;
     min?: number;
     max?: number;
+    catalogParams?: CatalogParam[];
   }>
 > {
   const categories: Record<
@@ -109,6 +119,7 @@ function catalogToCategories(catalog: CatalogItem[]): Record<
       unit: string;
       min?: number;
       max?: number;
+      catalogParams?: CatalogParam[];
     }>
   > = {};
   for (const item of catalog) {
@@ -128,6 +139,7 @@ function catalogToCategories(catalog: CatalogItem[]): Record<
           : "value",
       min: mainParam?.min ?? undefined,
       max: mainParam?.max ?? undefined,
+      catalogParams: item.params,
     });
   }
   return categories;
@@ -149,6 +161,7 @@ export default function ScenariosPage() {
         unit: string;
         min?: number;
         max?: number;
+        catalogParams?: CatalogParam[];
       }>
     >
   >(FALLBACK_CATEGORIES);
@@ -261,10 +274,19 @@ export default function ScenariosPage() {
     unit: string,
     min?: number,
     max?: number,
+    catalogParams?: CatalogParam[],
   ) {
     setInterventions((prev) => ({
       ...prev,
-      [name]: { category, name, value, unit, min, max },
+      [name]: {
+        category,
+        name,
+        value,
+        unit,
+        min,
+        max,
+        catalogParams: catalogParams ?? prev[name]?.catalogParams,
+      },
     }));
   }
 
@@ -302,11 +324,17 @@ export default function ScenariosPage() {
       return;
     }
 
-    // Build structured intervention specs
-    const interventionSpecs = Object.values(interventions).map((iv) => ({
-      type: iv.name,
-      params: { [iv.name === "vmt_reduction" ? "factor" : "value"]: iv.value },
-    }));
+    // Build structured intervention specs using catalog param names
+    const interventionSpecs = Object.values(interventions).map((iv) => {
+      const paramName = iv.catalogParams?.[0]?.name ?? "value";
+      const paramType = iv.catalogParams?.[0]?.type;
+      // Dict params like ev_subsidy's proportion_shift need special wrapping
+      const paramValue =
+        paramType === "dict" && iv.name === "ev_subsidy"
+          ? { bev: iv.value }
+          : iv.value;
+      return { type: iv.name, params: { [paramName]: paramValue } };
+    });
 
     // Custom overrides go as raw overrides
     const overrides: Record<string, unknown> = {};
@@ -795,6 +823,7 @@ export default function ScenariosPage() {
                                     intervention.unit,
                                     intervention.min,
                                     intervention.max,
+                                    intervention.catalogParams,
                                   );
                                 } else {
                                   handleRemoveIntervention(intervention.name);
@@ -820,6 +849,7 @@ export default function ScenariosPage() {
                                     intervention.unit,
                                     intervention.min,
                                     intervention.max,
+                                    intervention.catalogParams,
                                   );
                                 }
                               }}
