@@ -42,9 +42,9 @@ DEFAULT_ELASTICITIES = [
     ),
     ElasticityLink(
         driver_node="electricity_price",
-        target_node="ev_operating_cost_advantage",
+        target_node="powertrain_preference_shift",
         elasticity=-0.05,
-        description="EV cost advantage elasticity w.r.t. electricity price",
+        description="EV preference elasticity w.r.t. electricity price",
         source="Estimated",
     ),
 ]
@@ -143,12 +143,18 @@ def compute_vmt_adjustment_node(
 
 
 def compute_pt_pref_shift_node(
-    oil_price: float, powertrain_pref_oil_elasticity: float
+    oil_price: float,
+    powertrain_pref_oil_elasticity: float,
+    electricity_price: float,
+    ev_elec_price_elasticity: float,
 ) -> float:
-    """DAG compute: powertrain preference shift from oil price."""
-    return compute_powertrain_preference_shift(
+    """DAG compute: powertrain preference shift from oil and electricity prices."""
+    oil_effect = compute_powertrain_preference_shift(
         oil_price, elasticity=powertrain_pref_oil_elasticity
     )
+    baseline_elec_price = 0.130  # $/kWh, first value in default EIA AEO trajectory
+    elec_effect = apply_elasticity(1.0, baseline_elec_price, electricity_price, ev_elec_price_elasticity)
+    return oil_effect * elec_effect
 
 
 def create_macro_driver_nodes(
@@ -217,6 +223,14 @@ def create_macro_driver_nodes(
             description="Elasticity of BEV purchase preference with respect to oil price (~0.1). Higher oil prices increase EV adoption.",
             tags=["macro", "input", "adjustable"],
         ),
+        Node(
+            name="ev_elec_price_elasticity",
+            node_type=NodeType.SCALAR,
+            value=defaults.ev_elec_price_elasticity,
+            display_name="EV Electricity Price Elasticity",
+            description="Elasticity of BEV purchase preference with respect to electricity price (~-0.05). Higher electricity prices dampen EV adoption.",
+            tags=["macro", "input", "adjustable"],
+        ),
         # Computed driver values
         Node(
             name="oil_price",
@@ -248,7 +262,7 @@ def create_macro_driver_nodes(
             node_type=NodeType.SCALAR,
             compute_fn=compute_pt_pref_shift_node,
             display_name="EV Preference Shift",
-            description="Multiplier on BEV share of new sales based on oil price changes. Applies **EV Preference-Oil Elasticity** to **Oil Price** (>1 = more EVs).",
+            description="Multiplier on BEV share of new sales based on energy price changes. Combines **Oil Price** (via **EV Preference-Oil Elasticity**) and **Electricity Price** (via **EV Electricity Price Elasticity**). >1 = more EVs.",
             tags=["macro", "process"],
         ),
     ]

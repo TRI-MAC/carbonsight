@@ -71,3 +71,6 @@ class MacroDriverDefaults(BaseModel):
     powertrain_pref_oil_elasticity: float = Field(
         default=0.1, description="EV preference elasticity w.r.t. oil price"
     )
+    ev_elec_price_elasticity: float = Field(
+        default=-0.05, description="EV preference elasticity w.r.t. electricity price"
+    )
