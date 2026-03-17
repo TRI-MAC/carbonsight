@@ -162,21 +162,6 @@ def create_fleet_dynamics_nodes(
     nodes = [
         # Input nodes
         Node(
-            name="fleet_inventory",
-            node_type=NodeType.DATAFRAME,
-            value=fleet_inventory,
-            initial_value=fleet_inventory,
-            display_name="Fleet Inventory",
-            description="Initial US light-duty vehicle stock (~280M vehicles) by powertrain, age, and VMT bucket. Loaded from EPA registration data.",
-            data_source=DataSource(
-                name="Fleet Inventory",
-                publication_date="2024",
-                url="current_veh_t0_VMT.csv",
-                transformations="Loaded from Ekiden v1 format",
-            ),
-            tags=["fleet", "input"],
-        ),
-        Node(
             name="survival_curves",
             node_type=NodeType.DATAFRAME,
             value=survival_curves,
@@ -325,7 +310,7 @@ def create_fleet_dynamics_nodes(
             compute_fn=compute_post_used_market_adjusted,
             initial_value=fleet_inventory,
             display_name="Final Fleet",
-            description="Year-end fleet after used car market reshuffling. Applies **Used Market Reshuffle Rate** to **Mileage-Adjusted Fleet** to redistribute vehicles across VMT buckets.",
+            description="Year-end fleet after used car market reshuffling. Applies **Used Market Reshuffle Rate** to **Mileage-Adjusted Fleet** to redistribute vehicles across VMT buckets. Initialized from EPA fleet inventory data (~280M vehicles) at year 0.",
             tags=["fleet", "process"],
         ),
         Node(

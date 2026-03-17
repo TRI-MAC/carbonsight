@@ -18,30 +18,6 @@ import type { Trace } from "../components/NodeTraceChart";
 // Demo data for offline/fallback mode
 const DEMO_NODES: GraphNode[] = [
   {
-    name: "fleet_inventory",
-    type: "input",
-    is_input: true,
-    upstream: [],
-    temporal: [],
-    tags: ["fleet"],
-    display_name: "Fleet Inventory",
-    description:
-      "Initial US light-duty vehicle stock (~280M vehicles) by powertrain, age, and VMT bucket.",
-    data_source: {
-      name: "IEA Global EV Outlook 2024",
-      publication_date: "2024-04-15",
-      url: "https://www.iea.org/reports/global-ev-outlook-2024",
-    },
-    assumptions: [
-      {
-        description: "Current fleet composition by vehicle type and age",
-        rationale:
-          "IEA provides the most comprehensive global vehicle stock data",
-        confidence: "high",
-      },
-    ],
-  },
-  {
     name: "survival_curves",
     type: "input",
     is_input: true,
@@ -97,12 +73,12 @@ const DEMO_NODES: GraphNode[] = [
     name: "aged_fleet",
     type: "compute",
     is_input: false,
-    upstream: ["fleet_inventory"],
-    temporal: ["aged_fleet"],
+    upstream: [],
+    temporal: ["post_scrappage"],
     tags: ["fleet"],
     display_name: "Aged Fleet",
     description:
-      "All vehicles aged by one year. Reads prior year's **Fleet Inventory** and increments each vehicle's age.",
+      "All vehicles aged by one year. Reads prior year's **Surviving Fleet** and increments each vehicle's age.",
   },
   {
     name: "post_scrappage",
