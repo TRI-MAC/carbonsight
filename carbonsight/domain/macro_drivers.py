@@ -164,6 +164,8 @@ def create_macro_driver_nodes(
             name="oil_price_trajectory",
             node_type=NodeType.TIMESERIES,
             value=defaults.oil_price_per_barrel.values,
+            display_name="Oil Price Trajectory",
+            description="Projected crude oil price per barrel over the simulation horizon. From EIA Annual Energy Outlook.",
             data_source=DataSource(
                 name="EIA AEO 2024",
                 url="https://www.eia.gov/outlooks/aeo/",
@@ -174,6 +176,8 @@ def create_macro_driver_nodes(
             name="electricity_price_trajectory",
             node_type=NodeType.TIMESERIES,
             value=defaults.electricity_price_per_kwh.values,
+            display_name="Electricity Price Trajectory",
+            description="Projected electricity price per kWh over the simulation horizon. From EIA Annual Energy Outlook.",
             data_source=DataSource(
                 name="EIA AEO 2024",
                 url="https://www.eia.gov/outlooks/aeo/",
@@ -185,6 +189,8 @@ def create_macro_driver_nodes(
             name="year_index",
             node_type=NodeType.SCALAR,
             value=0,
+            display_name="Simulation Year",
+            description="Current year offset from simulation start (0 = base year).",
             tags=["macro", "input"],
         ),
         # Elasticity parameters
@@ -192,6 +198,8 @@ def create_macro_driver_nodes(
             name="vmt_oil_price_elasticity",
             node_type=NodeType.SCALAR,
             value=defaults.vmt_oil_price_elasticity,
+            display_name="VMT-Oil Price Elasticity",
+            description="Short-run elasticity of driving distance with respect to fuel price (~-0.2). Higher oil prices reduce driving.",
             assumptions=[
                 Assumption(
                     description="Short-run VMT elasticity w.r.t. fuel price = -0.2",
@@ -205,6 +213,8 @@ def create_macro_driver_nodes(
             name="powertrain_pref_oil_elasticity",
             node_type=NodeType.SCALAR,
             value=defaults.powertrain_pref_oil_elasticity,
+            display_name="EV Preference-Oil Elasticity",
+            description="Elasticity of BEV purchase preference with respect to oil price (~0.1). Higher oil prices increase EV adoption.",
             tags=["macro", "input", "adjustable"],
         ),
         # Computed driver values
@@ -212,12 +222,16 @@ def create_macro_driver_nodes(
             name="oil_price",
             node_type=NodeType.SCALAR,
             compute_fn=compute_oil_price_node,
+            display_name="Oil Price",
+            description="Current year's oil price, extracted from **Oil Price Trajectory** using **Simulation Year**.",
             tags=["macro", "process"],
         ),
         Node(
             name="electricity_price",
             node_type=NodeType.SCALAR,
             compute_fn=compute_electricity_price_node,
+            display_name="Electricity Price",
+            description="Current year's electricity price, extracted from **Electricity Price Trajectory** using **Simulation Year**.",
             tags=["macro", "process"],
         ),
         # Elasticity-derived adjustments
@@ -225,12 +239,16 @@ def create_macro_driver_nodes(
             name="vmt_adjustment",
             node_type=NodeType.SCALAR,
             compute_fn=compute_vmt_adjustment_node,
+            display_name="Driving Distance Adjustment",
+            description="Multiplier on fleet mileage based on oil price changes. Applies **VMT-Oil Price Elasticity** to **Oil Price** (e.g., 0.96 = 4% reduction).",
             tags=["macro", "process"],
         ),
         Node(
             name="powertrain_preference_shift",
             node_type=NodeType.SCALAR,
             compute_fn=compute_pt_pref_shift_node,
+            display_name="EV Preference Shift",
+            description="Multiplier on BEV share of new sales based on oil price changes. Applies **EV Preference-Oil Elasticity** to **Oil Price** (>1 = more EVs).",
             tags=["macro", "process"],
         ),
     ]
