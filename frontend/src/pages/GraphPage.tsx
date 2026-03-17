@@ -351,6 +351,26 @@ export default function GraphPage() {
           style: { stroke: "var(--border-subtle)", strokeWidth: 2 },
         });
       });
+      gn.temporal.forEach((temporalName) => {
+        flowEdges.push({
+          id: `temporal-${temporalName}-${gn.name}`,
+          source: temporalName,
+          target: gn.name,
+          type: "smoothstep",
+          animated: true,
+          label: "prev year",
+          labelStyle: { fontSize: 9, fill: "var(--accent-violet)" },
+          labelBgStyle: {
+            fill: "var(--bg-surface)",
+            fillOpacity: 0.9,
+          },
+          style: {
+            stroke: "var(--accent-violet)",
+            strokeWidth: 2,
+            strokeDasharray: "6 3",
+          },
+        });
+      });
     });
 
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
@@ -373,22 +393,25 @@ export default function GraphPage() {
 
     const nodeMap = new Map(graphNodes.map((n) => [n.name, n]));
 
-    // Find all ancestors (upstream recursively)
+    // Find all ancestors (upstream + temporal recursively)
     const findAncestors = (nodeName: string) => {
       const node = nodeMap.get(nodeName);
       if (!node) return;
-      node.upstream.forEach((upstreamName) => {
-        if (!ancestorSet.has(upstreamName)) {
-          ancestorSet.add(upstreamName);
-          findAncestors(upstreamName);
+      [...node.upstream, ...node.temporal].forEach((depName) => {
+        if (!ancestorSet.has(depName)) {
+          ancestorSet.add(depName);
+          findAncestors(depName);
         }
       });
     };
 
-    // Find all descendants (downstream recursively)
+    // Find all descendants (downstream + temporal recursively)
     const findDescendants = (nodeName: string) => {
       graphNodes.forEach((gn) => {
-        if (gn.upstream.includes(nodeName) && !descendantSet.has(gn.name)) {
+        if (
+          (gn.upstream.includes(nodeName) || gn.temporal.includes(nodeName)) &&
+          !descendantSet.has(gn.name)
+        ) {
           descendantSet.add(gn.name);
           findDescendants(gn.name);
         }
@@ -415,11 +438,20 @@ export default function GraphPage() {
         })),
       );
       setEdges((eds) =>
-        eds.map((edge) => ({
-          ...edge,
-          animated: false,
-          style: { stroke: "var(--border-subtle)", strokeWidth: 2 },
-        })),
+        eds.map((edge) => {
+          const isTemporal = edge.id.startsWith("temporal-");
+          return {
+            ...edge,
+            animated: isTemporal,
+            style: {
+              stroke: isTemporal
+                ? "var(--accent-violet)"
+                : "var(--border-subtle)",
+              strokeWidth: 2,
+              ...(isTemporal ? { strokeDasharray: "6 3" } : {}),
+            },
+          };
+        }),
       );
       return;
     }
@@ -445,6 +477,7 @@ export default function GraphPage() {
 
     setEdges((eds) =>
       eds.map((edge) => {
+        const isTemporal = edge.id.startsWith("temporal-");
         const isInPath =
           (edge.source === selectedNode.name ||
             ancestors.has(edge.source) ||
@@ -455,11 +488,16 @@ export default function GraphPage() {
 
         return {
           ...edge,
-          animated: isInPath,
+          animated: isInPath || isTemporal,
           style: {
-            stroke: isInPath ? "var(--accent-cyan)" : "var(--border-subtle)",
+            stroke: isInPath
+              ? "var(--accent-cyan)"
+              : isTemporal
+                ? "var(--accent-violet)"
+                : "var(--border-subtle)",
             strokeWidth: isInPath ? 3 : 2,
             opacity: isInPath ? 1 : 0.25,
+            ...(isTemporal && !isInPath ? { strokeDasharray: "6 3" } : {}),
           },
         };
       }),
