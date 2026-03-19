@@ -83,12 +83,32 @@ def carbon_pricing(price_per_tonne: float, start_year: int = 0) -> Intervention:
 
 
 def ev_subsidy(proportion_shift: dict[str, float]) -> Intervention:
-    """Create an EV subsidy intervention that shifts powertrain proportions."""
+    """Create an EV subsidy intervention that shifts powertrain proportions.
+
+    proportion_shift can be either:
+    - A full dict with all powertrains (used as-is)
+    - A partial dict (e.g., {'bev': 0.15}) — merged with baseline proportions,
+      with ICEV absorbing the difference to keep sum=1.0
+    """
+    all_pts = {"icev", "hev", "phev", "bev"}
+    if all_pts.issubset(proportion_shift.keys()):
+        proportions = proportion_shift
+    else:
+        baseline = {"icev": 0.82, "hev": 0.09, "phev": 0.02, "bev": 0.07}
+        proportions = dict(baseline)
+        for pt, target in proportion_shift.items():
+            if pt in proportions:
+                delta = target - proportions[pt]
+                proportions[pt] = target
+                if "icev" in proportions:
+                    proportions["icev"] = max(0.01, proportions["icev"] - delta)
+        total = sum(proportions.values())
+        proportions = {k: v / total for k, v in proportions.items()}
     return Intervention(
         name="ev_subsidy",
         category=InterventionCategory.POLICY,
         description="EV purchase subsidy shifting powertrain mix",
-        overrides={"powertrain_proportions": proportion_shift},
+        overrides={"powertrain_proportions": proportions},
     )
 
 
@@ -110,7 +130,7 @@ def grid_decarbonization(trajectory: dict[int, float]) -> Intervention:
 
     trajectory: year -> grid_ghg_per_kwh values.
     """
-    year_overrides = {y: {"grid_ghg_per_kwh": v} for y, v in trajectory.items()}
+    year_overrides = {int(y): {"grid_ghg_per_kwh": v} for y, v in trajectory.items()}
     return Intervention(
         name="grid_decarbonization",
         category=InterventionCategory.GRID_ENERGY,
