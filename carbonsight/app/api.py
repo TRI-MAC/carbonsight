@@ -189,6 +189,26 @@ def seed_demo_scenarios():
         ))
 
 
+def run_scenario_by_name(name: str):
+    """Run a scenario by name and store the result. For use at startup."""
+    scenario = scenario_store.get(name)
+    graph = get_graph()
+    config = SimulationConfig(
+        start_year=2024,
+        num_years=10,
+        execution_mode=ExecutionMode.DETERMINISTIC,
+    )
+    year_overrides = None
+    if scenario.interventions:
+        intervention_objs = resolve_interventions(scenario.interventions)
+        year_overrides = resolve_year_overrides(
+            intervention_objs, list(range(2024, 2034))
+        )
+    engine = SimulationEngine(graph, config)
+    result = engine.run(overrides=scenario.overrides, mode=ExecutionMode.DETERMINISTIC, year_overrides=year_overrides)
+    _results_store[name] = result
+
+
 @app.get("/demo")
 def get_demo():
     """Run curated baseline + intervention and return combined comparison data."""

@@ -1,7 +1,7 @@
 """Start CarbonSight API with initialized simulation graph."""
 import uvicorn
 
-from carbonsight.app.api import app, set_graph
+from carbonsight.app.api import app, set_graph, seed_demo_scenarios, run_scenario_by_name
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.data.loaders import load_fleet_inventory, load_survival_curves, load_vmt_by_age
 from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
@@ -24,6 +24,13 @@ graph.validate()
 
 set_graph(graph)
 print(f"Graph initialized: {len(graph.nodes)} nodes")
+
+# Seed and pre-run standard scenarios
+seed_demo_scenarios()
+for name in ["baseline", "ev-grid-intervention"]:
+    run_scenario_by_name(name)
+    print(f"Pre-ran scenario: {name}")
+
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
