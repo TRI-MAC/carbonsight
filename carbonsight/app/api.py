@@ -614,8 +614,16 @@ def get_node_trace(name: str, node_name: str):
             years.append(yr.year)
             raw_values.append(yr.outputs[node_name])
 
-    # Determine if scalar or dict-valued
+    # Skip DataFrame-valued nodes (not reducible to a simple timeseries)
+    import pandas as pd
     sample = raw_values[0] if raw_values else None
+    if isinstance(sample, pd.DataFrame):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Node '{node_name}' produces DataFrame values; trace not supported.",
+        )
+
+    # Determine if scalar or dict-valued
     if isinstance(sample, dict):
         fields = [k for k in sample.keys() if isinstance(sample[k], (int, float))]
         field_values = {
@@ -629,7 +637,15 @@ def get_node_trace(name: str, node_name: str):
     else:
         fields = None
         field_values = None
-        values = [float(v) if isinstance(v, (int, float)) else 0.0 for v in raw_values]
+        def _scalar(v, yi):
+            if isinstance(v, (int, float)):
+                return float(v)
+            if isinstance(v, list):
+                idx = min(yi, len(v) - 1)
+                return float(v[idx]) if v else 0.0
+            return 0.0
+
+        values = [_scalar(v, i) for i, v in enumerate(raw_values)]
 
     return {
         "scenario": name,
