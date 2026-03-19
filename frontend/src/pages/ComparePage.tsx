@@ -30,7 +30,7 @@ interface ComparisonData {
     node: string;
     year: number;
     absolute: number;
-    percentage: number;
+    percentage: number | null;
   }>;
   attribution?: Array<{ intervention: string; contribution: number }>;
 }
@@ -104,65 +104,21 @@ export default function ComparePage() {
   const [demoMode, setDemoMode] = useState(false);
   const [runStatus, setRunStatus] = useState<Record<string, RunStatus>>({});
 
-  useEffect(() => {
-    api
-      .listScenarios()
-      .then(async (list) => {
-        const scenarioList = list.map((s) => ({ name: s.name }));
-        setScenarios(scenarioList);
-        setDemoMode(false);
-        // Probe run status for each scenario
-        const statusMap: Record<string, RunStatus> = {};
-        for (const s of scenarioList) {
-          statusMap[s.name] = "checking";
-        }
-        setRunStatus({ ...statusMap });
-        await Promise.all(
-          scenarioList.map(async (s) => {
-            try {
-              await api.getTrace(s.name, "total_emissions");
-              statusMap[s.name] = "ready";
-            } catch {
-              statusMap[s.name] = "not-run";
-            }
-          }),
-        );
-        setRunStatus({ ...statusMap });
-      })
-      .catch(() => {
-        setScenarios(DEMO_SCENARIOS);
-        setDemoMode(true);
-      });
-  }, []);
-
-  const toggle = (name: string) =>
-    setSelected((prev) =>
-      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
-    );
-
-  const compare = async () => {
-    if (selected.length < 2) {
-      setError("Select at least 2 scenarios");
-      return;
-    }
+  const runComparison = async (scenarioNames: string[]) => {
+    if (scenarioNames.length < 2) return;
     setLoading(true);
     setError(null);
     try {
-      const [baseline, ...rest] = selected;
+      const [baseline, ...rest] = scenarioNames;
       const result = await api.compare(baseline, rest);
 
-      // Fetch trace data for each selected scenario
       const traceResults = await Promise.allSettled(
-        selected.map((name) => api.getTrace(name, "total_emissions")),
+        scenarioNames.map((name) => api.getTrace(name, "total_emissions")),
       );
 
-      // Build trajectory from real trace data
-      const trajectory: Array<Record<string, number>> = [];
       const failedTraces: string[] = [];
-
-      // Check for trace failures
       traceResults.forEach((tr, i) => {
-        if (tr.status === "rejected") failedTraces.push(selected[i]);
+        if (tr.status === "rejected") failedTraces.push(scenarioNames[i]);
       });
 
       if (failedTraces.length > 0) {
@@ -173,29 +129,28 @@ export default function ComparePage() {
         return;
       }
 
-      // All traces succeeded — build chart data
       const traces = traceResults.map(
         (tr) =>
           (tr as PromiseFulfilledResult<import("../types").TraceResponse>)
             .value,
       );
       const years = traces[0]?.years ?? [];
+      const trajectory: Array<Record<string, number>> = [];
       for (let yi = 0; yi < years.length; yi++) {
         const pt: Record<string, number> = { year: years[yi] };
         traces.forEach((trace, si) => {
-          pt[selected[si]] = trace.values[yi] ?? 0;
+          const vals = trace.field_values?.total_ghg ?? trace.values;
+          pt[scenarioNames[si]] = vals[yi] ?? 0;
         });
         trajectory.push(pt);
       }
 
-      // Build comparison data
       const comparisonData: ComparisonData = {
         trajectory,
         deltas: [],
         attribution: undefined,
       };
 
-      // Extract deltas from comparison result
       for (const [, comp] of Object.entries(result.comparisons ?? {})) {
         const compDeltas =
           (
@@ -220,7 +175,7 @@ export default function ComparePage() {
       setData(comparisonData);
     } catch {
       if (demoMode) {
-        setData(generateDemoData(selected));
+        setData(generateDemoData(scenarioNames));
       } else {
         setError("Comparison failed. Is the API running?");
       }
@@ -228,6 +183,51 @@ export default function ComparePage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    api
+      .listScenarios()
+      .then(async (list) => {
+        const scenarioList = list.map((s) => ({ name: s.name }));
+        setScenarios(scenarioList);
+        setDemoMode(false);
+        const statusMap: Record<string, RunStatus> = {};
+        for (const s of scenarioList) {
+          statusMap[s.name] = "checking";
+        }
+        setRunStatus({ ...statusMap });
+        await Promise.all(
+          scenarioList.map(async (s) => {
+            try {
+              await api.getTrace(s.name, "total_emissions");
+              statusMap[s.name] = "ready";
+            } catch {
+              statusMap[s.name] = "not-run";
+            }
+          }),
+        );
+        setRunStatus({ ...statusMap });
+
+        // Auto-select and compare if standard scenarios are ready
+        const standardPair = ["baseline", "ev-grid-intervention"];
+        if (standardPair.every((n) => statusMap[n] === "ready")) {
+          setSelected(standardPair);
+          runComparison(standardPair);
+        }
+      })
+      .catch(() => {
+        setScenarios(DEMO_SCENARIOS);
+        setDemoMode(true);
+      });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const toggle = (name: string) =>
+    setSelected((prev) =>
+      prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name],
+    );
+
+  const compare = () => runComparison(selected);
 
   const exportCSV = () => {
     if (!data) return;
@@ -461,11 +461,12 @@ export default function ComparePage() {
                       style={{
                         padding: "10px 12px",
                         fontSize: 13,
-                        color: d.percentage < 0 ? "#34d399" : "#f87171",
+                        color: d.percentage != null && d.percentage < 0 ? "#34d399" : "#f87171",
                       }}
                     >
-                      {d.percentage > 0 ? "+" : ""}
-                      {d.percentage.toFixed(1)}%
+                      {d.percentage != null
+                        ? `${d.percentage > 0 ? "+" : ""}${d.percentage.toFixed(1)}%`
+                        : "—"}
                     </td>
                   </tr>
                 ))}
