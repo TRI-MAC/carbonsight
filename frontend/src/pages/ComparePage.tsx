@@ -12,11 +12,15 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
+  ReferenceArea,
   ReferenceLine,
+  Label,
 } from "recharts";
 import { api } from "../api/client";
+import type { TraceResponse } from "../types";
 import Card from "../components/Card";
 import Button from "../components/Button";
+import DeltaSummaryCard from "../components/DeltaSummaryCard";
 
 interface Scenario {
   name: string;
@@ -103,6 +107,12 @@ export default function ComparePage() {
   const [error, setError] = useState<string | null>(null);
   const [demoMode, setDemoMode] = useState(false);
   const [runStatus, setRunStatus] = useState<Record<string, RunStatus>>({});
+  const [expandedCard, setExpandedCard] = useState<string | null>(null);
+  const [metricTraces, setMetricTraces] = useState<{
+    years: number[];
+    baseline: Record<string, number[]>;
+    intervention: Record<string, number[]>;
+  } | null>(null);
 
   const runComparison = async (scenarioNames: string[]) => {
     if (scenarioNames.length < 2) return;
@@ -130,9 +140,7 @@ export default function ComparePage() {
       }
 
       const traces = traceResults.map(
-        (tr) =>
-          (tr as PromiseFulfilledResult<import("../types").TraceResponse>)
-            .value,
+        (tr) => (tr as PromiseFulfilledResult<TraceResponse>).value,
       );
       const years = traces[0]?.years ?? [];
       const trajectory: Array<Record<string, number>> = [];
@@ -143,6 +151,52 @@ export default function ComparePage() {
           pt[scenarioNames[si]] = vals[yi] ?? 0;
         });
         trajectory.push(pt);
+      }
+
+      // Fetch grid_ghg_per_kwh traces for both scenarios
+      const gridTraceResults = await Promise.allSettled(
+        scenarioNames.map((name) => api.getTrace(name, "grid_ghg_per_kwh")),
+      );
+      const gridTraces = gridTraceResults.map((tr) =>
+        tr.status === "fulfilled"
+          ? (tr as PromiseFulfilledResult<TraceResponse>).value
+          : null,
+      );
+
+      // Extract 5 metrics for summary cards (baseline = first scenario, intervention = second)
+      if (scenarioNames.length >= 2) {
+        const emissionsFields = [
+          "total_ghg",
+          "usage_ghg_gas",
+          "usage_ghg_electric",
+          "production_ghg",
+        ];
+        const baselineEmissions = traces[0];
+        const interventionEmissions = traces[1];
+
+        const baselineMetrics: Record<string, number[]> = {};
+        const interventionMetrics: Record<string, number[]> = {};
+
+        for (const field of emissionsFields) {
+          baselineMetrics[field] =
+            baselineEmissions.field_values?.[field] ?? baselineEmissions.values;
+          interventionMetrics[field] =
+            interventionEmissions.field_values?.[field] ??
+            interventionEmissions.values;
+        }
+
+        // Grid intensity
+        const baselineGrid = gridTraces[0];
+        const interventionGrid = gridTraces[1];
+        baselineMetrics["grid_ghg_per_kwh"] = baselineGrid?.values ?? [];
+        interventionMetrics["grid_ghg_per_kwh"] =
+          interventionGrid?.values ?? [];
+
+        setMetricTraces({
+          years,
+          baseline: baselineMetrics,
+          intervention: interventionMetrics,
+        });
       }
 
       const comparisonData: ComparisonData = {
@@ -219,7 +273,7 @@ export default function ComparePage() {
         setScenarios(DEMO_SCENARIOS);
         setDemoMode(true);
       });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const toggle = (name: string) =>
@@ -383,6 +437,90 @@ export default function ComparePage() {
                 />
                 <Tooltip contentStyle={tooltipStyle} />
                 <Legend wrapperStyle={{ color: "#8b95a8" }} />
+                {/* Delta shading between baseline and intervention */}
+                {selected.length === 2 &&
+                  data.trajectory.length > 1 &&
+                  (() => {
+                    const [base, intv] = selected;
+                    const areas: React.ReactElement[] = [];
+                    for (let i = 0; i < data.trajectory.length - 1; i++) {
+                      const y1 = data.trajectory[i].year;
+                      const y2 = data.trajectory[i + 1].year;
+                      const avgBase =
+                        ((data.trajectory[i][base] ?? 0) +
+                          (data.trajectory[i + 1][base] ?? 0)) /
+                        2;
+                      const avgIntv =
+                        ((data.trajectory[i][intv] ?? 0) +
+                          (data.trajectory[i + 1][intv] ?? 0)) /
+                        2;
+                      const fill =
+                        avgIntv < avgBase ? "#34d39920" : "#f871711f";
+                      areas.push(
+                        <ReferenceArea
+                          key={`delta-${y1}`}
+                          x1={y1}
+                          x2={y2}
+                          fill={fill}
+                          strokeOpacity={0}
+                        />,
+                      );
+                    }
+                    // Crossover annotation
+                    for (let i = 0; i < data.trajectory.length - 1; i++) {
+                      const d1 =
+                        (data.trajectory[i][intv] ?? 0) -
+                        (data.trajectory[i][base] ?? 0);
+                      const d2 =
+                        (data.trajectory[i + 1][intv] ?? 0) -
+                        (data.trajectory[i + 1][base] ?? 0);
+                      if ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) {
+                        const crossYear = data.trajectory[i + 1].year;
+                        areas.push(
+                          <ReferenceLine
+                            key={`crossover-${crossYear}`}
+                            x={crossYear}
+                            stroke="#fbbf24"
+                            strokeDasharray="4 4"
+                          >
+                            <Label
+                              value={`Crossover: ${crossYear}`}
+                              position="top"
+                              fill="#fbbf24"
+                              fontSize={11}
+                            />
+                          </ReferenceLine>,
+                        );
+                        break;
+                      }
+                    }
+                    // Final-year annotation
+                    const lastPt = data.trajectory[data.trajectory.length - 1];
+                    const finalBase = lastPt[base] ?? 0;
+                    const finalIntv = lastPt[intv] ?? 0;
+                    const finalPct =
+                      finalBase !== 0
+                        ? ((finalIntv - finalBase) / finalBase) * 100
+                        : null;
+                    if (finalPct != null) {
+                      areas.push(
+                        <ReferenceLine
+                          key="final-year"
+                          x={lastPt.year}
+                          stroke="none"
+                        >
+                          <Label
+                            value={`${finalPct > 0 ? "+" : ""}${finalPct.toFixed(1)}% by ${lastPt.year}`}
+                            position="insideTopRight"
+                            fill={finalPct < 0 ? "#34d399" : "#f87171"}
+                            fontSize={12}
+                            fontWeight={600}
+                          />
+                        </ReferenceLine>,
+                      );
+                    }
+                    return areas;
+                  })()}
                 {selected.map((s, i) => (
                   <Fragment key={s}>
                     <Area
@@ -415,64 +553,55 @@ export default function ComparePage() {
             </ResponsiveContainer>
           </Card>
 
-          <Card title="Delta Breakdown" style={{ marginBottom: 24 }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ borderBottom: "2px solid #1e293b" }}>
-                  {["Node", "Year", "Absolute (Mt CO2e)", "Percentage"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        style={{
-                          padding: "10px 12px",
-                          textAlign: "left",
-                          color: "#8b95a8",
-                          fontSize: 12,
-                          fontFamily: "JetBrains Mono",
-                          textTransform: "uppercase",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {data.deltas.map((d, i) => (
-                  <tr key={i} style={{ borderBottom: "1px solid #1e293b" }}>
-                    <td style={{ padding: "10px 12px", fontSize: 13 }}>
-                      {d.node}
-                    </td>
-                    <td style={{ padding: "10px 12px", fontSize: 13 }}>
-                      {d.year}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        fontSize: 13,
-                        color: d.absolute < 0 ? "#34d399" : "#f87171",
-                      }}
-                    >
-                      {d.absolute > 0 ? "+" : ""}
-                      {d.absolute.toFixed(1)}
-                    </td>
-                    <td
-                      style={{
-                        padding: "10px 12px",
-                        fontSize: 13,
-                        color: d.percentage != null && d.percentage < 0 ? "#34d399" : "#f87171",
-                      }}
-                    >
-                      {d.percentage != null
-                        ? `${d.percentage > 0 ? "+" : ""}${d.percentage.toFixed(1)}%`
-                        : "—"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
+          {metricTraces && metricTraces.years.length > 0 && (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))",
+                gap: 12,
+                marginBottom: 24,
+              }}
+            >
+              {(
+                [
+                  { key: "total_ghg", label: "Total GHG", unit: "Mt CO2e" },
+                  {
+                    key: "usage_ghg_gas",
+                    label: "Gas Usage Emissions",
+                    unit: "Mt CO2e",
+                  },
+                  {
+                    key: "usage_ghg_electric",
+                    label: "Electric Usage Emissions",
+                    unit: "Mt CO2e",
+                  },
+                  {
+                    key: "production_ghg",
+                    label: "Production Emissions",
+                    unit: "Mt CO2e",
+                  },
+                  {
+                    key: "grid_ghg_per_kwh",
+                    label: "Grid Carbon Intensity",
+                    unit: "kg CO2/kWh",
+                  },
+                ] as const
+              ).map(({ key, label, unit }) => (
+                <DeltaSummaryCard
+                  key={key}
+                  metric={label}
+                  baselineValues={metricTraces.baseline[key] ?? []}
+                  interventionValues={metricTraces.intervention[key] ?? []}
+                  years={metricTraces.years}
+                  unit={unit}
+                  expanded={expandedCard === key}
+                  onToggle={() =>
+                    setExpandedCard((prev) => (prev === key ? null : key))
+                  }
+                />
+              ))}
+            </div>
+          )}
 
           {data.attribution && (
             <Card title="Attribution Waterfall">
