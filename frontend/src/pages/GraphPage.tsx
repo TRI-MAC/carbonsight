@@ -48,7 +48,8 @@ const DEMO_NODES: GraphNode[] = [
     temporal: [],
     tags: ["macro"],
     display_name: "Oil Price",
-    description: "Crude oil price projection from EIA Short-Term Energy Outlook.",
+    description:
+      "Crude oil price projection from EIA Short-Term Energy Outlook.",
     data_source: {
       name: "EIA Short-Term Energy Outlook",
       publication_date: "2024-01-10",
@@ -62,8 +63,7 @@ const DEMO_NODES: GraphNode[] = [
     temporal: [],
     tags: ["emissions", "macro"],
     display_name: "Grid Carbon Intensity",
-    description:
-      "CO2 emitted per kWh of electricity from the grid.",
+    description: "CO2 emitted per kWh of electricity from the grid.",
     data_source: {
       name: "IEA World Energy Outlook 2024",
       publication_date: "2024-10-24",
@@ -334,7 +334,7 @@ export default function GraphPage() {
           target: gn.name,
           type: "smoothstep",
           animated: true,
-          label: "prev year",
+          label: "last year",
           labelStyle: { fontSize: 9, fill: "var(--accent-violet)" },
           labelBgStyle: {
             fill: "var(--bg-surface)",
