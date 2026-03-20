@@ -40,17 +40,17 @@ The system SHALL provide a user interface for creating and editing scenarios. Us
 
 ### Requirement: Scenario Comparison View
 
-The system SHALL provide a view for comparing two or more scenarios side-by-side or as overlaid charts. The comparison view MUST display: absolute values for each scenario, deltas between scenarios (absolute and percentage), and year-by-year breakdowns. Users MUST be able to select which output metrics to compare.
+The system SHALL provide a view for comparing two or more scenarios. The comparison view MUST display: a trajectory chart with shaded delta areas between scenarios, and summary cards showing key metric deltas (Total GHG, Gas Usage, Electric Usage, Production Emissions, Grid Intensity). The flat per-node delta table is removed. Users MUST be able to expand summary cards to see year-by-year detail for each metric.
 
 #### Scenario: Compare baseline and intervention scenarios
 
-- **WHEN** a user selects the baseline scenario and an "Aggressive EV Policy" scenario for comparison
-- **THEN** the system SHALL display side-by-side or overlaid charts showing cumulative GHG, fleet composition, and other selected metrics for both scenarios with the delta highlighted
+- **WHEN** a user selects the baseline scenario and an intervention scenario for comparison
+- **THEN** the system SHALL display the trajectory chart with shaded delta area and 5 summary cards showing final-year deltas with sparkline trends
 
 #### Scenario: Compare three or more scenarios
 
 - **WHEN** a user selects three scenarios for comparison
-- **THEN** the system SHALL display all three on the same chart with distinct visual encoding (color, line style) and a legend identifying each scenario
+- **THEN** the system SHALL display all three on the trajectory chart with distinct visual encoding (color, line style) and summary cards comparing each intervention against the first-selected (baseline) scenario
 
 ### Requirement: Cumulative GHG Trajectory Chart
 
