@@ -38,19 +38,9 @@ The system SHALL provide a user interface for creating and editing scenarios. Us
 - **WHEN** a user enters a negative value for carbon price
 - **THEN** the UI SHALL display a validation error and prevent the scenario from being saved
 
-### Requirement: Scenario Comparison View
+### Requirement: Dashboard and Comparison Views
 
-The system SHALL provide a view for comparing two or more scenarios. The comparison view MUST display: a trajectory chart with shaded delta areas between scenarios, and summary cards showing key metric deltas (Total GHG, Gas Usage, Electric Usage, Production Emissions, Grid Intensity). The flat per-node delta table is removed. Users MUST be able to expand summary cards to see year-by-year detail for each metric.
-
-#### Scenario: Compare baseline and intervention scenarios
-
-- **WHEN** a user selects the baseline scenario and an intervention scenario for comparison
-- **THEN** the system SHALL display the trajectory chart with shaded delta area and 5 summary cards showing final-year deltas with sparkline trends
-
-#### Scenario: Compare three or more scenarios
-
-- **WHEN** a user selects three scenarios for comparison
-- **THEN** the system SHALL display all three on the trajectory chart with distinct visual encoding (color, line style) and summary cards comparing each intervention against the first-selected (baseline) scenario
+The system SHALL provide dashboard and comparison views as tabs within a single unified page, replacing the separate Dashboard and Compare pages. The "Overview" tab displays single-scenario metrics and charts. The "Compare" tab displays multi-scenario trajectory comparison with delta analysis. A scenario selector dropdown at the top of the page determines which scenario is being viewed or used as the comparison baseline.
 
 ### Requirement: Cumulative GHG Trajectory Chart
 
