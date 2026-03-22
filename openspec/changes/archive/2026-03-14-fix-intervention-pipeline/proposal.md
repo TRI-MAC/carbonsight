@@ -14,11 +14,13 @@ The intervention system is CarbonSight's core differentiator — answering "what
 ## Capabilities
 
 ### New Capabilities
+
 - `year-specific-execution`: Engine and API support for time-varying intervention overrides applied per simulation year
 - `intervention-api`: REST endpoints to list, create, and compose interventions; scenarios reference interventions by name
 - `macro-fleet-linkage`: Macro driver outputs (VMT adjustment, powertrain preference shift) propagate into fleet dynamics nodes
 
 ### Modified Capabilities
+
 - `node-trace-endpoint`: Add intervention metadata to trace responses (which interventions affected this node)
 - `node-trace-visualization`: ComparePage and SensitivityPage use real API data; sensitivity endpoint returns computed Sobol indices
 

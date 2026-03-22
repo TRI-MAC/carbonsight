@@ -13,6 +13,7 @@ CarbonSight's fleet renewal model computes new vehicle sales as 5.0% of the post
 ## Capabilities
 
 ### New Capabilities
+
 - `exogenous-fleet-renewal`: Fixed/configurable new vehicle sales volume decoupled from fleet size, with optional annual growth rate
 
 ### Modified Capabilities

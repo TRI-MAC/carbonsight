@@ -7,12 +7,14 @@ Ekiden v1 uses `pre_scrappage_fleet_size × 0.052`, which coincidentally produce
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Replace percentage-based renewal with fixed exogenous sales volume
 - Produce a realistic baseline fleet trajectory (slow growth, within VISION 280-300M range)
 - Maintain backward compatibility for scenario overrides and intervention analysis
 - Improve regression alignment with Ekiden v1
 
 **Non-Goals:**
+
 - Econometric modeling of sales (price elasticity, interest rates, etc.) — that's a future macro driver
 - Changing scrappage logic (survival curves are validated)
 - Matching Ekiden v1 exactly (structural differences in temporal feedback loop remain)
@@ -24,9 +26,10 @@ Ekiden v1 uses `pre_scrappage_fleet_size × 0.052`, which coincidentally produce
 **Decision:** Use `annual_sales_volume = 15_500_000` as an exogenous DAG input node.
 
 **Alternatives considered:**
-- *5.2% of pre-scrappage (Ekiden v1)*: Produces stable fleet by coincidence, but sales shouldn't depend on fleet size. Interventions that change scrappage would incorrectly alter sales.
-- *5.0% of post-scrappage (current)*: Unrealistic shrinking fleet, compounds errors.
-- *Replace scrapped + growth*: More mechanistic but couples sales to scrappage, which isn't how the market works.
+
+- _5.2% of pre-scrappage (Ekiden v1)_: Produces stable fleet by coincidence, but sales shouldn't depend on fleet size. Interventions that change scrappage would incorrectly alter sales.
+- _5.0% of post-scrappage (current)_: Unrealistic shrinking fleet, compounds errors.
+- _Replace scrapped + growth_: More mechanistic but couples sales to scrappage, which isn't how the market works.
 
 **Rationale:** Fixed volume is the simplest, most defensible baseline. Real sales are primarily demand-driven. Decoupling from fleet size means interventions affecting scrappage don't artificially change sales counts.
 

@@ -3,6 +3,7 @@
 The ComparePage and ScenariosPage were built with demo fallbacks but never fully connected to the live API for the comparison workflow. The trace endpoint (`GET /scenarios/{name}/trace/{node_name}`) already exists and returns year-by-year values for any node. The comparison endpoint (`POST /compare`) returns delta values but not full trajectories — so the trajectory chart needs trace data fetched separately.
 
 Key files:
+
 - `frontend/src/pages/ComparePage.tsx` — trajectory chart, delta table, scenario selection
 - `frontend/src/pages/ScenariosPage.tsx` — intervention builder, scenario CRUD, run execution
 - `frontend/src/api/client.ts` — `api.getTrace()` already exists
@@ -11,11 +12,13 @@ Key files:
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Trajectory chart shows real data from completed runs
 - Users can tell at a glance which scenarios are runnable/comparable
 - Interventions created through the UI actually work when run
 
 **Non-Goals:**
+
 - New backend endpoints (everything needed already exists)
 - Redesigning the Compare page layout
 - Adding UQ confidence bands to the comparison chart (future work)

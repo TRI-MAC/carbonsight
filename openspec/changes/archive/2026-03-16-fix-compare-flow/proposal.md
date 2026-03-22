@@ -11,6 +11,7 @@ The Compare Scenarios flow has three bugs that make it unreliable for stakeholde
 ## Capabilities
 
 ### New Capabilities
+
 - `compare-flow-fixes`: Frontend fixes for the compare scenarios workflow — real trace data in charts, run-status indicators, correct intervention parameter mapping
 
 ### Modified Capabilities

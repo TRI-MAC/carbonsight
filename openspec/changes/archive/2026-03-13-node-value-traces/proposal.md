@@ -13,6 +13,7 @@ There is no way to inspect how individual graph node values evolve over a simula
 ## Capabilities
 
 ### New Capabilities
+
 - `node-trace-endpoint`: Backend endpoint returning per-node year-by-year time series with sub-field enumeration for dict-valued outputs
 - `node-trace-visualization`: Shared frontend component and page integrations for viewing node value traces on both ScenariosPage and GraphPage
 

@@ -9,6 +9,7 @@ There are 26 nodes total across `fleet_nodes.py` (17 nodes) and `emissions_nodes
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Every DAG node has a human-readable display name and plain-English description
 - Descriptions for compute nodes reference upstream dependencies by display name
 - Metadata is defined inline on Node definitions (single source of truth)
@@ -16,6 +17,7 @@ There are 26 nodes total across `fleet_nodes.py` (17 nodes) and `emissions_nodes
 - API serves new fields so any future client can use them
 
 **Non-Goals:**
+
 - Internationalization / multi-language support
 - User-editable node names or descriptions
 - Clickable upstream references in descriptions (future enhancement)

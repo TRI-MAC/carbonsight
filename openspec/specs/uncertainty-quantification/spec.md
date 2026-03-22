@@ -120,4 +120,4 @@ The system SHALL allow users to configure the number of Monte Carlo samples per 
 #### Scenario: Warn on insufficient samples for sensitivity analysis
 
 - **WHEN** a user requests Sobol index computation with only 100 samples
-- **THEN** the system SHALL warn that reliable Sobol indices typically require at least 1,000 * (number of inputs + 2) samples and offer to increase the sample count
+- **THEN** the system SHALL warn that reliable Sobol indices typically require at least 1,000 \* (number of inputs + 2) samples and offer to increase the sample count

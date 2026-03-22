@@ -3,6 +3,7 @@
 CarbonSight runs 10-year fleet simulations producing year-by-year outputs for ~23 graph nodes. Run results are stored in `_results_store` (in-memory dict keyed by scenario name) as `SimulationResult` objects containing `YearResult` entries with `outputs: dict[str, Any]`. Node outputs are either scalar (`float`) or dict-valued (e.g., `total_emissions` has sub-fields `total_ghg`, `production_ghg`, `usage_ghg_total`, `disposal_ghg`).
 
 The frontend has two relevant pages:
+
 - **ScenariosPage**: manages scenario CRUD and execution, holds `RunResult` in component state after a run
 - **GraphPage**: visualizes the DAG with a detail panel for selected nodes, currently shows metadata only (type, tags, data source, assumptions, connections)
 
@@ -11,6 +12,7 @@ Neither page currently supports viewing a node's values across simulation years.
 ## Goals / Non-Goals
 
 **Goals:**
+
 - View any node's year-by-year values as a line chart after running a scenario
 - Support dict-valued nodes via sub-field dropdown selection
 - On ScenariosPage: client-side extraction from existing RunResult (no extra API call)
@@ -18,6 +20,7 @@ Neither page currently supports viewing a node's values across simulation years.
 - Shared `<NodeTraceChart>` component for consistent rendering
 
 **Non-Goals:**
+
 - UQ uncertainty bands on traces (future enhancement)
 - Editing or overriding node values from the trace view
 - Persisting run results to disk (remains in-memory)
@@ -30,8 +33,9 @@ Neither page currently supports viewing a node's values across simulation years.
 **Choice:** ScenariosPage extracts traces client-side from `RunResult.outputs`; GraphPage fetches via a new `GET /scenarios/{name}/trace/{node_name}` endpoint.
 
 **Alternatives considered:**
-- *API-only*: Simpler code but redundant for ScenariosPage which already holds the data
-- *Client-only*: Would require GraphPage to fetch and store full run results for potentially many scenarios
+
+- _API-only_: Simpler code but redundant for ScenariosPage which already holds the data
+- _Client-only_: Would require GraphPage to fetch and store full run results for potentially many scenarios
 
 **Rationale:** Each page gets data the most natural way. ScenariosPage avoids a round-trip; GraphPage stays lightweight by fetching only what's needed.
 

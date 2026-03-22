@@ -13,6 +13,7 @@ CarbonSight's research program requires validation against Ekiden v1 (regression
 ## Capabilities
 
 ### New Capabilities
+
 - `regression-validation`: Automated regression tests comparing CarbonSight baseline against Ekiden v1 output trajectory, with configurable tolerance (default 5%)
 - `external-validation`: GREET lifecycle and VISION fleet spot-check tests with published reference values and source citations
 - `validation-report`: Generated markdown report summarizing all validation results for stakeholder consumption

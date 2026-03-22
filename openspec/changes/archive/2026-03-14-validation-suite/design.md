@@ -1,6 +1,7 @@
 ## Context
 
 CarbonSight is a 10-year fleet carbon simulator. The RPD requires validation against:
+
 1. **Ekiden v1** (regression): Total GHG trajectory should match within 5%
 2. **GREET 2024** (lifecycle): Per-vehicle emissions in the right ballpark
 3. **VISION** (fleet): Fleet size and powertrain mix evolution reasonable
@@ -12,12 +13,14 @@ Key difference: CarbonSight now has macro-economic drivers (oil price elasticity
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Automated pytest-based validation that runs with the rest of the test suite
 - Hardcoded reference values with source citations (no external file downloads)
 - Clear pass/fail with informative messages when tolerances are exceeded
 - A readable validation report for stakeholders
 
 **Non-Goals:**
+
 - Exact numerical match (different implementations will have minor differences)
 - Automated GREET/VISION data fetching or parsing
 - Continuous validation against live external data sources
@@ -44,6 +47,7 @@ Key difference: CarbonSight now has macro-economic drivers (oil price elasticity
 ### 3. Tolerance structure
 
 **Decision:** Use per-metric tolerances:
+
 - Regression Total GHG: 5% relative (per RPD)
 - Regression fleet size: 1% relative
 - GREET per-vehicle lifecycle: 20% relative (GREET's own uncertainty ranges are ~15-25%)

@@ -16,6 +16,7 @@ Toyota needs a decision-support tool that lets product strategists and policymak
 ## Capabilities
 
 ### New Capabilities
+
 - `simulation-engine`: Core DAG execution framework — typed nodes, topological execution, year-by-year time stepping, scenario management (baseline + counterfactual comparison)
 - `fleet-dynamics`: Vehicle stock model — new vehicle entry, aging, scrappage (survival curves), powertrain mix tracking, fleet composition over 10-year horizon
 - `emissions-model`: Lifecycle GHG calculation — production (body, powertrain, battery), usage (gasoline + electricity, PHEV utility factor), disposal; component-level with uncertainty ranges
@@ -26,6 +27,7 @@ Toyota needs a decision-support tool that lets product strategists and policymak
 - `visualization`: Interactive dashboard for scenario exploration — causal graph view, scenario comparison charts, uncertainty displays, intervention attribution views; designed for industry decision-makers
 
 ### Modified Capabilities
+
 <!-- No existing capabilities to modify — this is a greenfield project -->
 
 ## Impact

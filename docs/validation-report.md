@@ -8,72 +8,73 @@
 Compares CarbonSight baseline Total GHG against Ekiden v1 output.
 Tolerance: 5% relative (per RPD success criteria).
 
-| Year | CarbonSight (Mt) | Ekiden v1 (Mt) | Delta (%) | Status |
-|------|-----------------|----------------|-----------|--------|
-| 2024 | 1270.8 | 1243.4 | +2.2% | PASS |
-| 2025 | 1261.7 | 1216.1 | +3.7% | PASS |
-| 2026 | 1253.5 | 1190.3 | +5.3% | **FAIL** |
-| 2027 | 1246.3 | 1165.8 | +6.9% | **FAIL** |
-| 2028 | 1239.9 | 1142.7 | +8.5% | **FAIL** |
-| 2029 | 1234.4 | 1120.9 | +10.1% | **FAIL** |
-| 2030 | 1229.7 | 1100.5 | +11.7% | **FAIL** |
-| 2031 | 1225.7 | 1081.3 | +13.4% | **FAIL** |
-| 2032 | 1222.4 | 1063.4 | +14.9% | **FAIL** |
-| 2033 | 1219.7 | 1046.7 | +16.5% | **FAIL** |
+| Year | CarbonSight (Mt) | Ekiden v1 (Mt) | Delta (%) | Status   |
+| ---- | ---------------- | -------------- | --------- | -------- |
+| 2024 | 1270.8           | 1243.4         | +2.2%     | PASS     |
+| 2025 | 1261.7           | 1216.1         | +3.7%     | PASS     |
+| 2026 | 1253.5           | 1190.3         | +5.3%     | **FAIL** |
+| 2027 | 1246.3           | 1165.8         | +6.9%     | **FAIL** |
+| 2028 | 1239.9           | 1142.7         | +8.5%     | **FAIL** |
+| 2029 | 1234.4           | 1120.9         | +10.1%    | **FAIL** |
+| 2030 | 1229.7           | 1100.5         | +11.7%    | **FAIL** |
+| 2031 | 1225.7           | 1081.3         | +13.4%    | **FAIL** |
+| 2032 | 1222.4           | 1063.4         | +14.9%    | **FAIL** |
+| 2033 | 1219.7           | 1046.7         | +16.5%    | **FAIL** |
 
 ### Fleet Size Trajectory
 
-| Year | CarbonSight | Ekiden v1 | Delta (%) |
-|------|-------------|-----------|-----------|
-| 2024 | 280,921,221 | 279,981,221 | +0.3% |
-| 2025 | 281,837,796 | 279,961,561 | +0.7% |
-| 2026 | 282,748,794 | 279,940,997 | +1.0% |
-| 2027 | 283,653,098 | 279,919,511 | +1.3% |
-| 2028 | 284,549,376 | 279,897,090 | +1.7% |
-| 2029 | 285,436,034 | 279,873,728 | +2.0% |
-| 2030 | 286,311,184 | 279,849,424 | +2.3% |
-| 2031 | 287,172,589 | 279,824,191 | +2.6% |
-| 2032 | 288,017,630 | 279,798,049 | +2.9% |
-| 2033 | 288,843,257 | 279,771,035 | +3.2% |
+| Year | CarbonSight | Ekiden v1   | Delta (%) |
+| ---- | ----------- | ----------- | --------- |
+| 2024 | 280,921,221 | 279,981,221 | +0.3%     |
+| 2025 | 281,837,796 | 279,961,561 | +0.7%     |
+| 2026 | 282,748,794 | 279,940,997 | +1.0%     |
+| 2027 | 283,653,098 | 279,919,511 | +1.3%     |
+| 2028 | 284,549,376 | 279,897,090 | +1.7%     |
+| 2029 | 285,436,034 | 279,873,728 | +2.0%     |
+| 2030 | 286,311,184 | 279,849,424 | +2.3%     |
+| 2031 | 287,172,589 | 279,824,191 | +2.6%     |
+| 2032 | 288,017,630 | 279,798,049 | +2.9%     |
+| 2033 | 288,843,257 | 279,771,035 | +3.2%     |
 
 ### Powertrain Stock Shares (Year 0)
 
 | Powertrain | CarbonSight | Ekiden v1 | Delta (pp) |
-|------------|-------------|-----------|------------|
-| ICEV | 93.9% | 94.0% | -0.1 |
-| HEV | 3.4% | 3.4% | +0.0 |
-| PHEV | 0.6% | 0.6% | +0.0 |
-| BEV | 2.0% | 2.0% | -0.0 |
+| ---------- | ----------- | --------- | ---------- |
+| ICEV       | 93.9%       | 94.0%     | -0.1       |
+| HEV        | 3.4%        | 3.4%      | +0.0       |
+| PHEV       | 0.6%        | 0.6%      | +0.0       |
+| BEV        | 2.0%        | 2.0%      | -0.0       |
 
 ## 2. GREET 2024 Lifecycle Spot Checks
 
 Per-vehicle emissions compared against GREET 2024 published values.
 
-| Metric | CarbonSight | GREET Reference | GREET Range | Status |
-|--------|-------------|-----------------|-------------|--------|
-| ICEV Production | 5,600 kg | 5,600 kg | (4500, 7000) | PASS |
-| BEV Production (75 kWh) | 11,700 kg | 11,700 kg | (8000, 16000) | PASS |
-| ICEV Annual Usage | 4,267 kg | 4,267 kg | (3400, 5300) | PASS |
-| BEV Annual Usage | 1,492 kg | 1,490 kg | (800, 2200) | PASS |
+| Metric                  | CarbonSight | GREET Reference | GREET Range   | Status |
+| ----------------------- | ----------- | --------------- | ------------- | ------ |
+| ICEV Production         | 5,600 kg    | 5,600 kg        | (4500, 7000)  | PASS   |
+| BEV Production (75 kWh) | 11,700 kg   | 11,700 kg       | (8000, 16000) | PASS   |
+| ICEV Annual Usage       | 4,267 kg    | 4,267 kg        | (3400, 5300)  | PASS   |
+| BEV Annual Usage        | 1,492 kg    | 1,490 kg        | (800, 2200)   | PASS   |
 
 ## 3. VISION Fleet Spot Checks
 
-| Metric | Result | Reference | Status |
-|--------|--------|-----------|--------|
-| Fleet size range | 280,921,221 – 288,843,257 | 260,000,000 – 300,000,000 | PASS |
-| BEV share growth | 2.0% → 4.8% | Increases over time | PASS |
+| Metric           | Result                    | Reference                 | Status |
+| ---------------- | ------------------------- | ------------------------- | ------ |
+| Fleet size range | 280,921,221 – 288,843,257 | 260,000,000 – 300,000,000 | PASS   |
+| BEV share growth | 2.0% → 4.8%               | Increases over time       | PASS   |
 
 ## 4. Sources
 
-| Source | Version | Used For |
-|--------|---------|----------|
-| Ekiden v1 (TRI) | 2024 | Regression baseline trajectory |
-| Argonne GREET Model | 2024 | Per-vehicle lifecycle emission factors |
-| Argonne VISION Model | 2024 Reference Case | Fleet size and composition projections |
-| EPA Multi-Pollutant Standards | MY2027+ | Powertrain proportion assumptions |
-| NHTS | 2017 | VMT by vehicle age |
-| Greene & Leard | 2024 | Vehicle survival/scrappage curves |
-| EIA AEO | 2024 | Oil/electricity price trajectories |
+| Source                        | Version             | Used For                               |
+| ----------------------------- | ------------------- | -------------------------------------- |
+| Ekiden v1 (TRI)               | 2024                | Regression baseline trajectory         |
+| Argonne GREET Model           | 2024                | Per-vehicle lifecycle emission factors |
+| Argonne VISION Model          | 2024 Reference Case | Fleet size and composition projections |
+| EPA Multi-Pollutant Standards | MY2027+             | Powertrain proportion assumptions      |
+| NHTS                          | 2017                | VMT by vehicle age                     |
+| Greene & Leard                | 2024                | Vehicle survival/scrappage curves      |
+| EIA AEO                       | 2024                | Oil/electricity price trajectories     |
 
 ---
-*Generated by CarbonSight validation suite*
+
+_Generated by CarbonSight validation suite_

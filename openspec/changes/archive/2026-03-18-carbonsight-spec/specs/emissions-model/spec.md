@@ -7,7 +7,7 @@ The system SHALL calculate production-phase GHG emissions as the sum of three co
 #### Scenario: BEV production emissions
 
 - **WHEN** a battery electric vehicle is added to the fleet with a 75 kWh battery pack
-- **THEN** the system calculates production GHG as the sum of body (~4200 kg CO2e), powertrain (electric motor, lower than ICE default), and battery (75 * ~100 = ~7500 kg CO2e), each drawn from their respective uncertainty distributions
+- **THEN** the system calculates production GHG as the sum of body (~4200 kg CO2e), powertrain (electric motor, lower than ICE default), and battery (75 \* ~100 = ~7500 kg CO2e), each drawn from their respective uncertainty distributions
 
 #### Scenario: ICE vehicle production emissions
 
@@ -17,7 +17,7 @@ The system SHALL calculate production-phase GHG emissions as the sum of three co
 #### Scenario: PHEV production emissions
 
 - **WHEN** a plug-in hybrid vehicle is added to the fleet with a 15 kWh battery
-- **THEN** the system calculates production GHG as the sum of body, ICE powertrain, and battery (15 * ~100 = ~1500 kg CO2e) components
+- **THEN** the system calculates production GHG as the sum of body, ICE powertrain, and battery (15 \* ~100 = ~1500 kg CO2e) components
 
 ### Requirement: Usage Emissions - Gasoline
 
@@ -26,7 +26,7 @@ The system SHALL calculate usage-phase GHG emissions from gasoline consumption u
 #### Scenario: Annual gasoline emissions for an ICE vehicle
 
 - **WHEN** an ICE vehicle with 30 MPG drives 12,000 miles in a given year
-- **THEN** the system calculates gasoline usage emissions as (12000 / 30) * 8.89 = approximately 3556 kg CO2 for that year
+- **THEN** the system calculates gasoline usage emissions as (12000 / 30) \* 8.89 = approximately 3556 kg CO2 for that year
 
 #### Scenario: Gasoline emissions with biofuel blending
 
@@ -40,7 +40,7 @@ The system SHALL calculate usage-phase GHG emissions from electricity consumptio
 #### Scenario: Annual electricity emissions for a BEV
 
 - **WHEN** a BEV consuming 0.30 kWh/mile drives 12,000 miles in a given year with grid intensity of 369 g CO2/kWh
-- **THEN** the system calculates electricity usage emissions as 12000 * 0.30 * 0.369 = approximately 1329 kg CO2 for that year
+- **THEN** the system calculates electricity usage emissions as 12000 _ 0.30 _ 0.369 = approximately 1329 kg CO2 for that year
 
 #### Scenario: Electricity emissions under grid decarbonization
 

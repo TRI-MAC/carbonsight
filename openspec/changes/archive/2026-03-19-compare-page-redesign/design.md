@@ -3,6 +3,7 @@
 The Compare page (`ComparePage.tsx`) currently shows a GHG trajectory line chart and a flat Delta Breakdown table. The table renders every scalar node × year combination from the compare API response — ~170 rows, mostly zero deltas, using raw node names. The target audience is industry decision-makers and policymakers who need to quickly see "does this intervention help, and by how much?"
 
 Key files:
+
 - `frontend/src/pages/ComparePage.tsx` — main page component
 - `frontend/src/api/client.ts` — `api.compare()` and `api.getTrace()`
 - `carbonsight/app/api.py` — `/compare` returns per-node deltas, `/scenarios/{name}/trace/{node}` returns year-by-year values
@@ -12,12 +13,14 @@ The compare API already returns all the data needed. No backend changes required
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Replace the flat delta table with scannable summary cards showing key metric deltas
 - Add visual delta shading between trajectory lines on the existing chart
 - Add annotation callouts for key comparison points (crossover year, final-year delta)
 - Make the Compare page immediately useful for sense-checking interventions
 
 **Non-Goals:**
+
 - Backend API changes
 - New metrics or computed values (use what the trace endpoint already provides)
 - UQ confidence bands on comparison (future work)
@@ -34,6 +37,7 @@ The compare API already returns all the data needed. No backend changes required
 **Data source:** Each card fetches `field_values` from the `total_emissions` trace (for GHG components) and the `grid_ghg_per_kwh` trace (for grid intensity). Deltas are computed client-side by subtracting baseline from intervention values.
 
 **Alternatives considered:**
+
 - Use the compare API deltas directly: These include all nodes, requiring filtering. Client-side subtraction of trace values is simpler and gives us the full trajectory for sparklines.
 - Fewer cards (just total GHG): Rejected — decision-makers need to see the production vs usage tradeoff (e.g., more BEVs = higher production, lower usage).
 
@@ -52,6 +56,7 @@ The compare API already returns all the data needed. No backend changes required
 **Implementation:** Use recharts `Area` with a custom shape or `ReferenceArea` segments. For the crossover detection, find the first year where the delta sign changes. Annotations use recharts `Label` or custom SVG overlays.
 
 **Alternatives considered:**
+
 - Separate delta chart below the trajectory: Rejected — adds vertical space and forces the user to correlate two charts mentally.
 - Tooltip-only (no shading): Rejected — misses the at-a-glance value.
 

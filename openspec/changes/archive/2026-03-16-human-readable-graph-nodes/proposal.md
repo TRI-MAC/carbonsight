@@ -13,6 +13,7 @@ The graph explorer displays raw Python identifiers (e.g. `post_scrappage`, `gas_
 ## Capabilities
 
 ### New Capabilities
+
 - `node-metadata`: Human-readable display names and descriptions on DAG nodes, served via API and rendered in the graph explorer
 
 ### Modified Capabilities

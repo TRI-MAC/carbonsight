@@ -13,10 +13,12 @@ CarbonSight's research program identifies "demonstrated use in at least one real
 ## Capabilities
 
 ### New Capabilities
+
 - `demo-walkthrough`: Self-contained stakeholder demo page with narrated steps showing baseline analysis, intervention comparison, uncertainty quantification, and provenance tracing
 - `demo-launcher`: Single-command script to start the full stack with seeded demo scenarios
 
 ### Modified Capabilities
+
 <!-- No existing spec-level requirement changes needed -->
 
 ## Impact

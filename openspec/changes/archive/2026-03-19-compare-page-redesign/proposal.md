@@ -11,9 +11,11 @@ The Compare page's Delta Breakdown table is unusable for decision-makers. It ren
 ## Capabilities
 
 ### New Capabilities
+
 - `compare-delta-display`: Summary cards and visual delta overlay for scenario comparison — replaces the flat delta table with scannable cards and an annotated trajectory chart
 
 ### Modified Capabilities
+
 - `visualization`: The Compare page's delta breakdown section is being redesigned from a flat table to summary cards + annotated chart
 
 ## Impact

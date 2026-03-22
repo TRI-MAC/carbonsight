@@ -28,7 +28,7 @@
 
 - [x] 4.1 Implement year-by-year time stepping loop (10 years, 2024-2033) with year-indexed output store
 - [x] 4.2 Implement output chaining (year N outputs → year N+1 inputs)
-- [x] 4.3 Implement temporal edge resolution: declare temporal parameters (prev_<node_name>), resolve from prior year's output store
+- [x] 4.3 Implement temporal edge resolution: declare temporal parameters (prev\_<node_name>), resolve from prior year's output store
 - [x] 4.4 Implement initial/default value provision for temporal edges at year 0, reject temporal edges with missing initial values
 - [x] 4.5 Implement provenance distinction for temporal edges (record source year for lagged inputs)
 - [x] 4.6 Implement configurable time horizon (start year, number of years, renewal rate)

@@ -7,12 +7,14 @@ The oil price affects powertrain preference via `compute_pt_pref_shift_node(oil_
 ## Goals / Non-Goals
 
 **Goals:**
+
 - Wire electricity price into the powertrain preference shift computation
 - Follow the same elasticity pattern used for oil price
 - Combined effect: `shift = oil_effect * electricity_effect`
 - New `ev_elec_price_elasticity` input node with default -0.05
 
 **Non-Goals:**
+
 - Electricity price affecting VMT (too fine-grained for this model's resolution)
 - Electricity price affecting grid carbon intensity (different causal mechanism)
 - Adding a separate `ev_cost_adjustment` intermediate node (unnecessary complexity)

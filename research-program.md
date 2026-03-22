@@ -59,7 +59,7 @@ Current approaches include:
 Three things are new:
 
 1. **Causal graph with macro-economic inputs**: Instead of treating interventions as independent sliders, we model upstream drivers (oil prices, electricity prices, policy incentives, consumer preferences) that propagate causally through the system. A carbon tax doesn't just change fuel cost — it shifts powertrain mix, VMT, and used car market dynamics.
-2. **Explainable, traceable emissions**: Every output carries a full provenance chain — which data sources, assumptions, and model steps produced it. Decision-makers can interrogate *why* a scenario produces a given result, not just see the number.
+2. **Explainable, traceable emissions**: Every output carries a full provenance chain — which data sources, assumptions, and model steps produced it. Decision-makers can interrogate _why_ a scenario produces a given result, not just see the number.
 3. **Uncertainty quantification throughout**: Instead of point estimates, the system propagates distributions, giving confidence intervals on outcomes and identifying which uncertain inputs matter most via sensitivity analysis.
 
 We expect this to succeed because the Ekiden prototype already demonstrated the core DAG-based simulation approach works at a simpler scale. This is an expansion of a proven architecture with better data, richer causal structure, and formal UQ.
@@ -74,12 +74,14 @@ We expect this to succeed because the Ekiden prototype already demonstrated the 
 ### Q5: What are the risks and payoffs?
 
 **Risks:**
+
 - Macro-economic driver modeling (oil prices, consumer preferences) introduces assumptions that are inherently hard to validate against future outcomes
 - UQ can give a false sense of precision if input distributions are poorly characterized — garbage in, calibrated garbage out
 - Scope creep — integrating macro drivers, UQ, and explainability in a 1-year prototype with 1-2 people is ambitious
 - The model may be too complex for non-technical decision-makers to trust, or too simple for domain experts to respect
 
 **Payoffs:**
+
 - A decision-support tool that directly informs Toyota's decarbonization strategy with quantified confidence
 - Ability to rapidly evaluate new policy proposals or market shifts (scenario turnaround in minutes, not months)
 - Transparent, defensible carbon accounting that can withstand stakeholder scrutiny
@@ -97,12 +99,14 @@ We expect this to succeed because the Ekiden prototype already demonstrated the 
 ### Q7: What are the midterm and final "exams"?
 
 **Midterm milestones (6 months):**
+
 - Core fleet simulation reproduces Ekiden v1 results as a regression baseline
 - Macro-economic driver inputs (oil price, electricity price, consumer preference models) integrated and affecting fleet outcomes through the causal graph
 - UQ framework producing confidence intervals on Total GHG for at least 3 reference scenarios
 - At least one explainability mechanism operational (e.g., intervention attribution or provenance tracing)
 
 **Final success criteria (12 months):**
+
 - Full counterfactual analysis capability with 15+ intervention types across policy, technology, behavioral, and energy categories
 - Any output traceable to its data sources and assumptions (explainability)
 - Uncertainty propagation across the full causal graph with sensitivity analysis identifying top drivers
@@ -126,22 +130,22 @@ We expect this to succeed because the Ekiden prototype already demonstrated the 
 
 ### 3.1 Current Best Approaches
 
-| Approach | Description | Strengths | Limitations |
-|----------|-------------|-----------|-------------|
-| GREET (Argonne) | Lifecycle analysis tool for vehicles and fuels | Gold standard for well-to-wheels and cradle-to-grave LCA; extensive database | Static analysis, no fleet dynamics or time evolution; no counterfactuals |
-| VISION (Argonne) | Fleet stock turnover model | Mature fleet dynamics; projects energy use and emissions over decades | Treats manufacturing as exogenous; limited intervention types; no UQ |
-| LAVE-Trans (DOE) | Consumer choice + fleet model | Models consumer behavior and policy impacts on adoption | Complex, opaque; limited supply chain representation |
-| EPA MOVES | Official US mobile source emissions model | Regulatory standard; detailed driving cycle emissions | Usage-phase only; no manufacturing or disposal; not designed for counterfactuals |
-| GCAM (PNNL) | Integrated assessment model | Economy-wide; models energy-economy interactions | Too coarse for vehicle-level decisions; long learning curve |
-| SimaPro / openLCA | General-purpose LCA software | Flexible, standards-compliant (ISO 14040/44) | Per-product analysis, not fleet-level; no dynamics |
-| Ekiden v1 (TRI) | Causal DAG fleet + carbon simulator | Causal structure, counterfactual interventions, interactive UI | Scalar manufacturing, no UQ, no macro drivers, limited explainability |
+| Approach          | Description                                    | Strengths                                                                    | Limitations                                                                      |
+| ----------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| GREET (Argonne)   | Lifecycle analysis tool for vehicles and fuels | Gold standard for well-to-wheels and cradle-to-grave LCA; extensive database | Static analysis, no fleet dynamics or time evolution; no counterfactuals         |
+| VISION (Argonne)  | Fleet stock turnover model                     | Mature fleet dynamics; projects energy use and emissions over decades        | Treats manufacturing as exogenous; limited intervention types; no UQ             |
+| LAVE-Trans (DOE)  | Consumer choice + fleet model                  | Models consumer behavior and policy impacts on adoption                      | Complex, opaque; limited supply chain representation                             |
+| EPA MOVES         | Official US mobile source emissions model      | Regulatory standard; detailed driving cycle emissions                        | Usage-phase only; no manufacturing or disposal; not designed for counterfactuals |
+| GCAM (PNNL)       | Integrated assessment model                    | Economy-wide; models energy-economy interactions                             | Too coarse for vehicle-level decisions; long learning curve                      |
+| SimaPro / openLCA | General-purpose LCA software                   | Flexible, standards-compliant (ISO 14040/44)                                 | Per-product analysis, not fleet-level; no dynamics                               |
+| Ekiden v1 (TRI)   | Causal DAG fleet + carbon simulator            | Causal structure, counterfactual interventions, interactive UI               | Scalar manufacturing, no UQ, no macro drivers, limited explainability            |
 
 ### 3.2 Key Gaps
 
 - No tool integrates lifecycle emissions, fleet dynamics, macro-economic drivers, and counterfactual interventions in a single framework
 - Existing fleet models lack formal uncertainty quantification
 - Decision-makers must mentally integrate results from multiple tools (LCA + fleet model + economic forecast) to answer strategic questions
-- Explainability — being able to trace *why* a scenario produces a result — is absent from all current tools
+- Explainability — being able to trace _why_ a scenario produces a result — is absent from all current tools
 
 ---
 
@@ -149,30 +153,30 @@ We expect this to succeed because the Ekiden prototype already demonstrated the 
 
 ### 4.1 Foundational Works
 
-| Reference | Relevance |
-|-----------|-----------|
-| Greene & Leard, "Vehicle Survival and Scrappage Rates," 2024 | Statistical model for fleet turnover — used directly in Ekiden v1 and will be carried forward |
-| Argonne GREET Model (2024 release) | Lifecycle emissions factors for vehicles and fuels; primary data source for manufacturing and fuel-cycle emissions |
-| EPA "Multi-Pollutant Emissions Standards for MY2027+," 2024 | Defines powertrain mix targets and emissions standards that serve as policy scenarios |
-| NHTS 2017 (Federal Highway Administration) | Vehicle miles traveled by age, household, and vehicle type; basis for VMT modeling |
-| EIA Annual Energy Outlook 2024 | Oil price, electricity price, and energy mix projections used as macro-driver scenarios |
+| Reference                                                    | Relevance                                                                                                          |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| Greene & Leard, "Vehicle Survival and Scrappage Rates," 2024 | Statistical model for fleet turnover — used directly in Ekiden v1 and will be carried forward                      |
+| Argonne GREET Model (2024 release)                           | Lifecycle emissions factors for vehicles and fuels; primary data source for manufacturing and fuel-cycle emissions |
+| EPA "Multi-Pollutant Emissions Standards for MY2027+," 2024  | Defines powertrain mix targets and emissions standards that serve as policy scenarios                              |
+| NHTS 2017 (Federal Highway Administration)                   | Vehicle miles traveled by age, household, and vehicle type; basis for VMT modeling                                 |
+| EIA Annual Energy Outlook 2024                               | Oil price, electricity price, and energy mix projections used as macro-driver scenarios                            |
 
 ### 4.2 Closely Related Work
 
-| Reference | Relevance |
-|-----------|-----------|
-| Argonne VISION Model | Fleet stock model we'll validate against; complementary approach without supply chain or UQ |
-| Keith et al., "Vehicle fleet turnover and the future of fuel economy," Energy Policy, 2019 | Methods for modeling fleet composition evolution under policy scenarios |
-| Wolfram & Hertwich, "Representing vehicle-technology-specific consumer preferences in energy-economy models," J. Transport & Land Use, 2021 | Consumer preference modeling approaches relevant to our macro-driver integration |
-| Milovanoff et al., "Electrification of light-duty vehicle fleet alone will not meet mitigation targets," Nature Climate Change, 2020 | Demonstrates importance of multi-lever analysis (not just electrification) — validates our multi-intervention approach |
+| Reference                                                                                                                                   | Relevance                                                                                                              |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Argonne VISION Model                                                                                                                        | Fleet stock model we'll validate against; complementary approach without supply chain or UQ                            |
+| Keith et al., "Vehicle fleet turnover and the future of fuel economy," Energy Policy, 2019                                                  | Methods for modeling fleet composition evolution under policy scenarios                                                |
+| Wolfram & Hertwich, "Representing vehicle-technology-specific consumer preferences in energy-economy models," J. Transport & Land Use, 2021 | Consumer preference modeling approaches relevant to our macro-driver integration                                       |
+| Milovanoff et al., "Electrification of light-duty vehicle fleet alone will not meet mitigation targets," Nature Climate Change, 2020        | Demonstrates importance of multi-lever analysis (not just electrification) — validates our multi-intervention approach |
 
 ### 4.3 Inspirations and Analogies
 
-| Reference | Insight |
-|-----------|---------|
-| Pearl, "Causality" (2009) | Formal causal inference framework; DAG-based reasoning that underpins our simulation architecture |
-| Saltelli et al., "Global Sensitivity Analysis" (2008) | Methods for variance-based sensitivity analysis applicable to our UQ framework |
-| En-ROADS climate simulator (Climate Interactive) | UX inspiration — accessible, interactive "what if" tool for non-technical decision-makers; demonstrates the value of explainable simulation |
+| Reference                                             | Insight                                                                                                                                     |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pearl, "Causality" (2009)                             | Formal causal inference framework; DAG-based reasoning that underpins our simulation architecture                                           |
+| Saltelli et al., "Global Sensitivity Analysis" (2008) | Methods for variance-based sensitivity analysis applicable to our UQ framework                                                              |
+| En-ROADS climate simulator (Climate Interactive)      | UX inspiration — accessible, interactive "what if" tool for non-technical decision-makers; demonstrates the value of explainable simulation |
 
 ---
 
@@ -246,24 +250,24 @@ CarbonSight models the US light-duty vehicle fleet as a **directed acyclic graph
 
 ## 7. Success Criteria
 
-| Criterion | How Measured | Target |
-|-----------|-------------|--------|
-| Regression fidelity | Reproduce Ekiden v1 Total GHG within 5% for equivalent scenarios | Baseline parity |
-| Intervention coverage | Count of distinct, functional intervention types | >= 15 |
-| Uncertainty quantification | All primary outputs carry confidence intervals; sensitivity analysis identifies top-5 drivers | Operational UQ |
-| Explainability | Any output can be traced to data sources and assumptions in <= 3 clicks | Full provenance |
-| External validation | Comparison against GREET lifecycle values and VISION fleet projections | Within published uncertainty ranges |
-| Decision-maker usability | At least one Toyota stakeholder walkthrough with positive feedback on clarity and utility | Qualitative validation |
-| Simulation performance | Full 10-year scenario with UQ completes in < 60 seconds on standard hardware | Interactive speed |
+| Criterion                  | How Measured                                                                                  | Target                              |
+| -------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------- |
+| Regression fidelity        | Reproduce Ekiden v1 Total GHG within 5% for equivalent scenarios                              | Baseline parity                     |
+| Intervention coverage      | Count of distinct, functional intervention types                                              | >= 15                               |
+| Uncertainty quantification | All primary outputs carry confidence intervals; sensitivity analysis identifies top-5 drivers | Operational UQ                      |
+| Explainability             | Any output can be traced to data sources and assumptions in <= 3 clicks                       | Full provenance                     |
+| External validation        | Comparison against GREET lifecycle values and VISION fleet projections                        | Within published uncertainty ranges |
+| Decision-maker usability   | At least one Toyota stakeholder walkthrough with positive feedback on clarity and utility     | Qualitative validation              |
+| Simulation performance     | Full 10-year scenario with UQ completes in < 60 seconds on standard hardware                  | Interactive speed                   |
 
 ---
 
 ## 8. Revision History
 
-| Version | Date | Author | Summary of Changes |
-|---------|------|--------|--------------------|
-| 1.0 | 2026-03-12 | Andrew Taber | Initial version — created from Ekiden v1 analysis and research discussion |
+| Version | Date       | Author       | Summary of Changes                                                        |
+| ------- | ---------- | ------------ | ------------------------------------------------------------------------- |
+| 1.0     | 2026-03-12 | Andrew Taber | Initial version — created from Ekiden v1 analysis and research discussion |
 
 ---
 
-*End of Research Program Document*
+_End of Research Program Document_

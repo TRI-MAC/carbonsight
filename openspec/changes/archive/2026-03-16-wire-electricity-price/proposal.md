@@ -14,6 +14,7 @@
 ### New Capabilities
 
 ### Modified Capabilities
+
 - `macro-fleet-linkage`: Electricity price now feeds into powertrain preference shift via elasticity
 
 ## Impact

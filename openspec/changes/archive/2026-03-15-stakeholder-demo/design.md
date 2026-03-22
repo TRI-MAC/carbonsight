@@ -3,6 +3,7 @@
 CarbonSight has a working backend (242 tests passing), validated against GREET and VISION, with a React frontend that includes Dashboard, Scenarios, Compare, Graph, and Sensitivity pages. The frontend has demo fallback data when the API is unavailable. The RPD success criterion requires "at least one Toyota stakeholder walkthrough with positive feedback on clarity and utility."
 
 Current state:
+
 - Backend: FastAPI with `/dashboard`, `/scenarios`, `/compare`, `/graph`, `/scenarios/{name}/run`, `/scenarios/{name}/trace/{node}`, `/scenarios/{name}/provenance/{node}` endpoints
 - Frontend: 5 pages with dark "observatory" theme, recharts, ReactFlow DAG visualization
 - Gap: No curated end-to-end demo flow; stakeholder must navigate independently and set up scenarios manually
@@ -10,12 +11,14 @@ Current state:
 ## Goals / Non-Goals
 
 **Goals:**
+
 - A stakeholder can see CarbonSight's full value proposition in under 5 minutes
 - The demo works reliably (live API preferred, demo fallback when offline)
 - Narrative text guides non-technical viewers through each step
 - The demo showcases: fleet simulation, intervention analysis, comparison, and provenance/trust
 
 **Non-Goals:**
+
 - Interactive scenario editing (stakeholders watch, not operate)
 - UQ/sensitivity in the demo (adds complexity without core value for first demo)
 - New chart types or visualization libraries
