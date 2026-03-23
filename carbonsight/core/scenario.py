@@ -257,6 +257,14 @@ INTERVENTION_FACTORIES = {
     "battery_cost_reduction": "carbonsight.domain.interventions.battery_cost_reduction",
     "scrappage_program": "carbonsight.domain.interventions.scrappage_program",
     "phev_charging_improvement": "carbonsight.domain.interventions.phev_charging_improvement",
+    "oil_price_shock": "carbonsight.domain.interventions.oil_price_shock",
+    "electricity_price_change": "carbonsight.domain.interventions.electricity_price_change",
+    "body_manufacturing_decarb": "carbonsight.domain.interventions.body_manufacturing_decarb",
+    "ice_manufacturing_decarb": "carbonsight.domain.interventions.ice_manufacturing_decarb",
+    "disposal_reduction": "carbonsight.domain.interventions.disposal_reduction",
+    "sales_volume_change": "carbonsight.domain.interventions.sales_volume_change",
+    "used_market_incentive": "carbonsight.domain.interventions.used_market_incentive",
+    "eco_driving": "carbonsight.domain.interventions.eco_driving",
 }
 
 
@@ -276,6 +284,14 @@ def resolve_interventions(specs: list[InterventionSpec]) -> list:
         "battery_cost_reduction": iv_module.battery_cost_reduction,
         "scrappage_program": iv_module.scrappage_program,
         "phev_charging_improvement": iv_module.phev_charging_improvement,
+        "oil_price_shock": iv_module.oil_price_shock,
+        "electricity_price_change": iv_module.electricity_price_change,
+        "body_manufacturing_decarb": iv_module.body_manufacturing_decarb,
+        "ice_manufacturing_decarb": iv_module.ice_manufacturing_decarb,
+        "disposal_reduction": iv_module.disposal_reduction,
+        "sales_volume_change": iv_module.sales_volume_change,
+        "used_market_incentive": iv_module.used_market_incentive,
+        "eco_driving": iv_module.eco_driving,
     }
 
     results = []

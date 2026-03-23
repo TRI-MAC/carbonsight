@@ -201,7 +201,7 @@ class TestInterventionCatalog:
         response = client.get("/interventions")
         assert response.status_code == 200
         catalog = response.json()
-        assert len(catalog) == 7
+        assert len(catalog) == 15
         types = [i["type"] for i in catalog]
         assert "carbon_pricing" in types
         assert "ev_subsidy" in types

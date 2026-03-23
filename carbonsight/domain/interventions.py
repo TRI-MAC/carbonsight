@@ -206,6 +206,120 @@ def phev_charging_improvement(charging_factor: float = 0.85) -> Intervention:
     )
 
 
+def oil_price_shock(factor: float = 1.5) -> Intervention:
+    """Create an oil price trajectory intervention.
+
+    factor: multiplier on baseline oil price trajectory (e.g. 1.5 = 50% higher).
+    """
+    return Intervention(
+        name=f"oil_price_{int(factor*100)}pct",
+        category=InterventionCategory.GRID_ENERGY,
+        description=f"Oil price at {factor*100:.0f}% of baseline",
+        overrides={"oil_price_factor": factor},
+    )
+
+
+def electricity_price_change(factor: float = 0.8) -> Intervention:
+    """Create an electricity price trajectory intervention.
+
+    factor: multiplier on baseline electricity price (e.g. 0.8 = 20% cheaper).
+    """
+    return Intervention(
+        name=f"elec_price_{int(factor*100)}pct",
+        category=InterventionCategory.GRID_ENERGY,
+        description=f"Electricity price at {factor*100:.0f}% of baseline",
+        overrides={"electricity_price_factor": factor},
+    )
+
+
+def body_manufacturing_decarb(factor: float = 0.95) -> Intervention:
+    """Reduce body/chassis manufacturing emissions over time.
+
+    factor: annual retention factor (e.g. 0.95 = 5% annual reduction).
+    """
+    baseline_body = 5500.0  # kg CO2e baseline per vehicle
+    year_overrides = {
+        2024 + i: {"production_body": baseline_body * (factor ** i)}
+        for i in range(10)
+    }
+    return Intervention(
+        name="body_decarb",
+        category=InterventionCategory.TECHNOLOGY,
+        description="Body manufacturing emissions reduction",
+        year_overrides=year_overrides,
+    )
+
+
+def ice_manufacturing_decarb(factor: float = 0.95) -> Intervention:
+    """Reduce ICE powertrain manufacturing emissions over time.
+
+    factor: annual retention factor (e.g. 0.95 = 5% annual reduction).
+    """
+    baseline_ice = 1200.0  # kg CO2e baseline per ICE powertrain
+    year_overrides = {
+        2024 + i: {"production_ice": baseline_ice * (factor ** i)}
+        for i in range(10)
+    }
+    return Intervention(
+        name="ice_decarb",
+        category=InterventionCategory.TECHNOLOGY,
+        description="ICE powertrain manufacturing emissions reduction",
+        year_overrides=year_overrides,
+    )
+
+
+def disposal_reduction(factor: float = 0.8) -> Intervention:
+    """Reduce end-of-life disposal emissions per vehicle.
+
+    factor: fraction of baseline disposal emissions (e.g. 0.8 = 20% reduction).
+    """
+    return Intervention(
+        name=f"disposal_{int(factor*100)}pct",
+        category=InterventionCategory.TECHNOLOGY,
+        description=f"End-of-life emissions reduced to {factor*100:.0f}% of baseline",
+        overrides={"disposal_per_vehicle_factor": factor},
+    )
+
+
+def sales_volume_change(growth_rate: float = 0.01) -> Intervention:
+    """Change new vehicle sales growth rate.
+
+    growth_rate: annual growth rate (e.g. 0.01 = 1% growth, -0.02 = 2% decline).
+    """
+    return Intervention(
+        name=f"sales_growth_{int(growth_rate*100)}pct",
+        category=InterventionCategory.POLICY,
+        description=f"New vehicle sales growth rate: {growth_rate*100:+.1f}%/yr",
+        overrides={"sales_growth_rate": growth_rate},
+    )
+
+
+def used_market_incentive(reshuffle_rate: float = 0.05) -> Intervention:
+    """Incentivize used car market turnover.
+
+    reshuffle_rate: probability of vehicle reshuffle per year (baseline ~0.02).
+    """
+    return Intervention(
+        name=f"used_market_{int(reshuffle_rate*100)}pct",
+        category=InterventionCategory.POLICY,
+        description=f"Used market reshuffle rate: {reshuffle_rate*100:.1f}%/yr",
+        overrides={"reshuffle_probability": reshuffle_rate},
+    )
+
+
+def eco_driving(reduction_pct: float = 10.0) -> Intervention:
+    """Reduce VMT across all age cohorts via eco-driving/trip consolidation.
+
+    reduction_pct: percentage reduction in VMT (e.g. 10.0 = 10% less driving).
+    """
+    return Intervention(
+        name=f"eco_driving_{int(reduction_pct)}pct",
+        category=InterventionCategory.BEHAVIORAL,
+        description=f"Eco-driving: {reduction_pct:.0f}% VMT reduction across all cohorts",
+        overrides={"eco_driving_reduction": reduction_pct / 100.0},
+    )
+
+
 # --- Multi-intervention combination ---
 
 def combine_interventions(

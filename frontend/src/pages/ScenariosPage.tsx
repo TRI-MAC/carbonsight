@@ -33,12 +33,14 @@ const PARAM_LABELS: Record<string, string> = {
   price_per_tonne: "Carbon Price ($/tonne)",
   start_year: "Start Year",
   proportion_shift: "BEV Purchase Shift",
-  factor: "VMT Factor",
   factor: "Annual Retention Factor",
   age_threshold: "Age Threshold",
   acceleration_factor: "Acceleration Factor",
   duration_years: "Duration (Years)",
   charging_factor: "Charging Factor",
+  growth_rate: "Annual Growth Rate",
+  reshuffle_rate: "Reshuffle Rate (%/yr)",
+  reduction_pct: "VMT Reduction (%)",
 };
 
 export default function ScenariosPage() {
@@ -401,7 +403,11 @@ export default function ScenariosPage() {
                   {scenario.status === "completed" && "Completed"}
                   {scenario.status === "error" && "Error"}
                   {scenario.status === "idle" &&
-                    `${Object.keys(scenario.overrides).length} overrides`}
+                    (scenario.interventions?.length
+                      ? `${scenario.interventions.length} intervention${scenario.interventions.length === 1 ? "" : "s"}`
+                      : Object.keys(scenario.overrides).length > 0
+                        ? `${Object.keys(scenario.overrides).length} overrides`
+                        : "No interventions")}
                 </div>
               </div>
             ))

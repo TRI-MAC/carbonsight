@@ -163,6 +163,78 @@ INTERVENTION_CATALOG = [
             {"name": "charging_factor", "type": "float", "default": 0.85, "min": 0.5, "max": 1.0},
         ],
     },
+    {
+        "type": "oil_price_shock",
+        "category": InterventionCategory.GRID_ENERGY.value,
+        "description": "Oil price trajectory change",
+        "target_node": "oil_price",
+        "params": [
+            {"name": "factor", "type": "float", "default": 1.5, "min": 0.5, "max": 3.0},
+        ],
+    },
+    {
+        "type": "electricity_price_change",
+        "category": InterventionCategory.GRID_ENERGY.value,
+        "description": "Electricity price trajectory change",
+        "target_node": "electricity_price",
+        "params": [
+            {"name": "factor", "type": "float", "default": 0.8, "min": 0.5, "max": 2.0},
+        ],
+    },
+    {
+        "type": "body_manufacturing_decarb",
+        "category": InterventionCategory.TECHNOLOGY.value,
+        "description": "Body manufacturing emissions reduction",
+        "target_node": "production_body",
+        "params": [
+            {"name": "factor", "type": "float", "default": 0.95, "min": 0.80, "max": 1.0},
+        ],
+    },
+    {
+        "type": "ice_manufacturing_decarb",
+        "category": InterventionCategory.TECHNOLOGY.value,
+        "description": "ICE powertrain manufacturing emissions reduction",
+        "target_node": "production_ice",
+        "params": [
+            {"name": "factor", "type": "float", "default": 0.95, "min": 0.80, "max": 1.0},
+        ],
+    },
+    {
+        "type": "disposal_reduction",
+        "category": InterventionCategory.TECHNOLOGY.value,
+        "description": "End-of-life emissions reduction",
+        "target_node": "disposal_per_vehicle",
+        "params": [
+            {"name": "factor", "type": "float", "default": 0.8, "min": 0.5, "max": 1.0},
+        ],
+    },
+    {
+        "type": "sales_volume_change",
+        "category": InterventionCategory.POLICY.value,
+        "description": "New vehicle sales growth rate change",
+        "target_node": "sales_growth_rate",
+        "params": [
+            {"name": "growth_rate", "type": "float", "default": 0.01, "min": -0.05, "max": 0.05},
+        ],
+    },
+    {
+        "type": "used_market_incentive",
+        "category": InterventionCategory.POLICY.value,
+        "description": "Used car market turnover incentive",
+        "target_node": "reshuffle_probability",
+        "params": [
+            {"name": "reshuffle_rate", "type": "float", "default": 0.05, "min": 0.01, "max": 0.15},
+        ],
+    },
+    {
+        "type": "eco_driving",
+        "category": InterventionCategory.BEHAVIORAL.value,
+        "description": "Eco-driving and trip consolidation",
+        "target_node": "adjusted_vmt",
+        "params": [
+            {"name": "reduction_pct", "type": "float", "default": 10.0, "min": 1.0, "max": 30.0},
+        ],
+    },
 ]
 
 
@@ -406,10 +478,16 @@ def create_scenario(body: ScenarioCreate):
 @app.get("/scenarios")
 def list_scenarios():
     names = scenario_store.list()
-    return [
-        {"name": n, "overrides": scenario_store.get(n).overrides, "metadata": scenario_store.get(n).metadata}
-        for n in names
-    ]
+    results = []
+    for n in names:
+        s = scenario_store.get(n)
+        results.append({
+            "name": n,
+            "overrides": s.overrides,
+            "metadata": s.metadata,
+            "interventions": [{"type": i.type, "params": i.params} for i in s.interventions] if s.interventions else [],
+        })
+    return results
 
 
 @app.get("/scenarios/{name}")

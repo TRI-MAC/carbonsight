@@ -23,6 +23,7 @@ export interface ScenarioConfig {
   name: string;
   overrides: Record<string, unknown>;
   metadata: Record<string, unknown>;
+  interventions?: Array<{ type: string; params: Record<string, unknown> }>;
 }
 
 export interface YearOutput {
