@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import Button from "../components/Button";
 import CausalPathChips from "../components/CausalPathChips";
 import ImpactPreview from "../components/ImpactPreview";
+import { useToast } from "../components/Toast";
 import { useAutoRun } from "../hooks/useAutoRun";
 import { api } from "../api/client";
 import type { ScenarioConfig, GraphNode } from "../types";
@@ -66,6 +67,7 @@ export default function ScenariosPage() {
     "deterministic",
   );
   const [isRunningManual, setIsRunningManual] = useState(false);
+  const { toast } = useToast();
 
   // Auto-run
   const autoRun = useAutoRun(scenarioName);
@@ -230,8 +232,9 @@ export default function ScenariosPage() {
       }
       await loadData();
       setIsNewScenario(false);
+      toast(`Scenario "${scenarioName}" saved`, "success");
     } catch (error) {
-      if (!demoMode) alert(`Failed to save: ${error}`);
+      if (!demoMode) toast(`Failed to save: ${error}`, "error");
     }
   }
 
@@ -239,6 +242,8 @@ export default function ScenariosPage() {
     if (!scenarioName.trim()) return;
     setIsRunningManual(true);
     await handleSaveScenario();
+    const modeLabel = runMode === "uq" ? "UQ" : "deterministic";
+    toast(`Running ${modeLabel} simulation for "${scenarioName}"...`, "info");
     try {
       setScenarios((prev) =>
         prev.map((s) =>
@@ -259,6 +264,12 @@ export default function ScenariosPage() {
           s.name === scenarioName ? { ...s, status: "completed" as const } : s,
         ),
       );
+      const duration = completed.result?.wall_clock_seconds;
+      const durationStr = duration ? ` in ${duration.toFixed(1)}s` : "";
+      toast(
+        `Simulation complete for "${scenarioName}"${durationStr}`,
+        "success",
+      );
     } catch (error) {
       setScenarios((prev) =>
         prev.map((s) =>
@@ -267,6 +278,7 @@ export default function ScenariosPage() {
             : s,
         ),
       );
+      toast(`Simulation failed: ${error}`, "error");
     } finally {
       setIsRunningManual(false);
     }
