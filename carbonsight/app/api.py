@@ -685,7 +685,7 @@ def list_graph_nodes():
     graph = get_graph()
     nodes = []
     for name, node in graph.nodes.items():
-        nodes.append({
+        entry: dict = {
             "name": name,
             "type": node.node_type.value,
             "is_input": node.is_input,
@@ -694,7 +694,19 @@ def list_graph_nodes():
             "tags": node.tags,
             "display_name": node.display_name,
             "description": node.description,
-        })
+        }
+        if node.data_source:
+            entry["data_source"] = {
+                "name": node.data_source.name,
+                "publication_date": node.data_source.publication_date,
+                "url": node.data_source.url,
+            }
+        if node.assumptions:
+            entry["assumptions"] = [
+                {"description": a.description, "rationale": a.rationale, "confidence": a.confidence}
+                for a in node.assumptions
+            ]
+        nodes.append(entry)
     return nodes
 
 

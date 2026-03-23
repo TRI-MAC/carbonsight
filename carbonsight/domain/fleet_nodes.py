@@ -169,9 +169,9 @@ def create_fleet_dynamics_nodes(
             display_name="Survival Curves",
             description="Age-based probability of a vehicle remaining in service. Weibull parameters from Greene & Leard (2015) survival model.",
             data_source=DataSource(
-                name="Greene, D.L. & Leard, B. (2015). Vehicle Survival and Scrappage Rates. Oak Ridge National Laboratory.",
-                publication_date="2015",
-                url="https://doi.org/10.2172/1227092",
+                name="Lu, S. (2006). Vehicle Survivability and Travel Mileage Schedules. NHTSA DOT HS 809 952.",
+                publication_date="2006-01",
+                url="https://crashstats.nhtsa.dot.gov/Api/Public/ViewPublication/809952",
             ),
             tags=["fleet", "input"],
         ),

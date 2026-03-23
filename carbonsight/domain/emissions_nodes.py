@@ -76,7 +76,7 @@ def create_emissions_nodes(
             data_source=DataSource(
                 name="Argonne GREET 2024 Model — Vehicle Cycle",
                 publication_date="2024",
-                url="https://doi.org/10.11578/dc.20240829.2",
+                url="https://greet.anl.gov/",
             ),
             assumptions=[
                 Assumption(
@@ -96,7 +96,7 @@ def create_emissions_nodes(
             data_source=DataSource(
                 name="Argonne GREET 2024 Model — Vehicle Cycle",
                 publication_date="2024",
-                url="https://doi.org/10.11578/dc.20240829.2",
+                url="https://greet.anl.gov/",
             ),
             tags=["emissions", "input", "adjustable"],
         ),
@@ -107,9 +107,9 @@ def create_emissions_nodes(
             display_name="Battery Manufacturing Emissions",
             description="CO2 per kWh of battery capacity manufactured (~100 kg/kWh). Triangular(30, 100, 200).",
             data_source=DataSource(
-                name="Peters et al. (2017). Life cycle assessment of batteries. Nature Energy, 2, 17162.",
+                name="Peters, J. et al. (2017). The environmental impact of Li-Ion batteries. Renewable and Sustainable Energy Reviews, 67, 491-506.",
                 publication_date="2017",
-                url="https://doi.org/10.1038/nenergy.2017.162",
+                url="https://doi.org/10.1016/j.rser.2016.08.039",
             ),
             assumptions=[
                 Assumption(
@@ -129,7 +129,7 @@ def create_emissions_nodes(
             data_source=DataSource(
                 name="Argonne GREET 2024 Model — Fuel Cycle",
                 publication_date="2024",
-                url="https://doi.org/10.11578/dc.20240829.2",
+                url="https://greet.anl.gov/",
             ),
             assumptions=[
                 Assumption(
@@ -169,7 +169,7 @@ def create_emissions_nodes(
             data_source=DataSource(
                 name="Argonne GREET 2024 Model — End-of-Life Module",
                 publication_date="2024",
-                url="https://doi.org/10.11578/dc.20240829.2",
+                url="https://greet.anl.gov/",
             ),
             assumptions=[
                 Assumption(

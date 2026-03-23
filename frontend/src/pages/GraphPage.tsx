@@ -28,9 +28,9 @@ const DEMO_NODES: GraphNode[] = [
     description:
       "Age-based probability of a vehicle remaining in service. From Greene & Leard survival model.",
     data_source: {
-      name: "Greene, D.L. & Leard, B. (2015). Vehicle Survival and Scrappage Rates. ORNL.",
-      publication_date: "2015",
-      url: "https://doi.org/10.2172/1227092",
+      name: "Lu, S. (2006). Vehicle Survivability and Travel Mileage Schedules. NHTSA DOT HS 809 952.",
+      publication_date: "2006-01",
+      url: "https://crashstats.nhtsa.dot.gov/Api/Public/ViewPublication/809952",
     },
     assumptions: [
       {
