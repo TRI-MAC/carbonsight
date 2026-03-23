@@ -34,7 +34,7 @@ const PARAM_LABELS: Record<string, string> = {
   start_year: "Start Year",
   proportion_shift: "BEV Purchase Shift",
   factor: "VMT Factor",
-  trajectory: "Intensity Factor",
+  factor: "Annual Retention Factor",
   age_threshold: "Age Threshold",
   acceleration_factor: "Acceleration Factor",
   duration_years: "Duration (Years)",
@@ -63,6 +63,7 @@ export default function ScenariosPage() {
   const [runMode, setRunMode] = useState<"deterministic" | "uq">(
     "deterministic",
   );
+  const [isRunningManual, setIsRunningManual] = useState(false);
 
   // Auto-run
   const autoRun = useAutoRun(scenarioName);
@@ -234,6 +235,7 @@ export default function ScenariosPage() {
 
   async function handleRunScenario() {
     if (!scenarioName.trim()) return;
+    setIsRunningManual(true);
     await handleSaveScenario();
     try {
       setScenarios((prev) =>
@@ -241,11 +243,15 @@ export default function ScenariosPage() {
           s.name === scenarioName ? { ...s, status: "running" as const } : s,
         ),
       );
-      await api.runScenario(scenarioName, {
+      const job = await api.runScenario(scenarioName, {
         mode: runMode,
         num_years: 10,
         uq_samples: runMode === "uq" ? 1000 : undefined,
       });
+      const completed = await api.pollJob(job.job_id);
+      if (completed.status === "failed") {
+        throw new Error(completed.error ?? "Simulation failed");
+      }
       setScenarios((prev) =>
         prev.map((s) =>
           s.name === scenarioName ? { ...s, status: "completed" as const } : s,
@@ -259,6 +265,8 @@ export default function ScenariosPage() {
             : s,
         ),
       );
+    } finally {
+      setIsRunningManual(false);
     }
   }
 
@@ -707,9 +715,12 @@ export default function ScenariosPage() {
                 <Button
                   size="sm"
                   onClick={handleRunScenario}
-                  style={{ flex: 1 }}
+                  disabled={isRunningManual}
+                  style={{ flex: 1, opacity: isRunningManual ? 0.6 : 1 }}
                 >
-                  Run {runMode === "uq" ? "(UQ)" : ""}
+                  {isRunningManual
+                    ? "Running..."
+                    : `Run ${runMode === "uq" ? "(UQ)" : ""}`}
                 </Button>
                 {!isNewScenario && selectedScenario && (
                   <Button

@@ -37,10 +37,17 @@ export function useAutoRun(scenarioName: string, debounceMs = 800) {
       setError(null);
 
       try {
-        await api.runScenario(scenarioName, {
+        // Submit job (always deterministic for auto-run)
+        const job = await api.runScenario(scenarioName, {
           mode: "deterministic",
           num_years: 10,
         });
+
+        // Poll until complete
+        const completed = await api.pollJob(job.job_id);
+        if (completed.status === "failed") {
+          throw new Error(completed.error ?? "Simulation failed");
+        }
 
         if (runIdRef.current !== thisRunId) return;
 

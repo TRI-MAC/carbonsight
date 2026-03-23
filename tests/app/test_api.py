@@ -1,10 +1,26 @@
 """Integration tests for the CarbonSight API."""
 
+import time
+
 import pytest
 from fastapi.testclient import TestClient
 
 import carbonsight.app.api as api_module
-from carbonsight.app.api import app, scenario_store, set_graph, _results_store, seed_demo_scenarios
+from carbonsight.app.api import app, scenario_store, set_graph, _results_store, _jobs, seed_demo_scenarios
+
+
+def run_and_wait(client, scenario_name: str, run_json: dict, timeout: float = 10.0):
+    """Submit a run job and poll until completion. Returns the job result or raises."""
+    resp = client.post(f"/scenarios/{scenario_name}/run", json=run_json)
+    assert resp.status_code == 200
+    job_id = resp.json()["job_id"]
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        status = client.get(f"/jobs/{job_id}").json()
+        if status["status"] in ("completed", "failed"):
+            return status
+        time.sleep(0.05)
+    raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.core.node import Node, NodeType
 
@@ -14,6 +30,7 @@ def reset_state():
     """Reset API state between tests."""
     scenario_store._scenarios.clear()
     _results_store.clear()
+    _jobs.clear()
     api_module._dashboard_cache = None
     api_module._demo_cache = None
 
@@ -93,11 +110,11 @@ class TestScenarioCRUD:
 class TestSimulationExecution:
     def test_run_deterministic(self, client):
         client.post("/scenarios", json={"name": "baseline"})
-        response = client.post("/scenarios/baseline/run", json={
+        job = run_and_wait(client, "baseline", {
             "mode": "deterministic", "num_years": 2,
         })
-        assert response.status_code == 200
-        data = response.json()
+        assert job["status"] == "completed"
+        data = job["result"]
         assert data["mode"] == "deterministic"
         assert len(data["years"]) == 2
 
@@ -105,11 +122,11 @@ class TestSimulationExecution:
         client.post("/scenarios", json={
             "name": "override_test", "overrides": {"input_a": 100},
         })
-        response = client.post("/scenarios/override_test/run", json={
+        job = run_and_wait(client, "override_test", {
             "mode": "deterministic", "num_years": 1,
         })
-        assert response.status_code == 200
-        data = response.json()
+        assert job["status"] == "completed"
+        data = job["result"]
         # output = input_a * input_b = 100 * 5 = 500
         first_year = str(data["years"][0])
         assert data["outputs"][first_year]["output"] == 500
@@ -142,7 +159,7 @@ class TestGraphIntrospection:
 class TestProvenance:
     def test_get_provenance(self, client):
         client.post("/scenarios", json={"name": "baseline"})
-        client.post("/scenarios/baseline/run", json={"mode": "deterministic", "num_years": 1})
+        run_and_wait(client, "baseline", {"mode": "deterministic", "num_years": 1})
         response = client.get("/scenarios/baseline/provenance/output")
         assert response.status_code == 200
         assert "report" in response.json()
@@ -155,7 +172,7 @@ class TestProvenance:
 class TestNodeTrace:
     def test_trace_scalar_node(self, client):
         client.post("/scenarios", json={"name": "baseline"})
-        client.post("/scenarios/baseline/run", json={"mode": "deterministic", "num_years": 3})
+        run_and_wait(client, "baseline", {"mode": "deterministic", "num_years": 3})
         response = client.get("/scenarios/baseline/trace/output")
         assert response.status_code == 200
         data = response.json()
@@ -173,7 +190,7 @@ class TestNodeTrace:
 
     def test_trace_node_not_found(self, client):
         client.post("/scenarios", json={"name": "baseline"})
-        client.post("/scenarios/baseline/run", json={"mode": "deterministic", "num_years": 1})
+        run_and_wait(client, "baseline", {"mode": "deterministic", "num_years": 1})
         response = client.get("/scenarios/baseline/trace/nonexistent_node")
         assert response.status_code == 404
         assert "not found in results" in response.json()["detail"]
@@ -232,11 +249,11 @@ class TestScenarioWithInterventions:
             "name": "test",
             "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
         })
-        response = client.post("/scenarios/test/run", json={
+        job = run_and_wait(client, "test", {
             "mode": "deterministic", "num_years": 2,
         })
-        assert response.status_code == 200
-        data = response.json()
+        assert job["status"] == "completed"
+        data = job["result"]
         assert data["scenario"] == "test"
         assert len(data["years"]) == 2
 
@@ -315,7 +332,7 @@ class TestDemoSeeding:
 class TestSensitivity:
     def test_sensitivity_requires_uq(self, client):
         client.post("/scenarios", json={"name": "test"})
-        client.post("/scenarios/test/run", json={"mode": "deterministic", "num_years": 1})
+        run_and_wait(client, "test", {"mode": "deterministic", "num_years": 1})
         response = client.get("/scenarios/test/sensitivity")
         assert response.status_code == 400
         assert "UQ mode" in response.json()["detail"]

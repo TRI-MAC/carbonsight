@@ -125,12 +125,21 @@ def vmt_reduction(factor: float) -> Intervention:
     )
 
 
-def grid_decarbonization(trajectory: dict[int, float]) -> Intervention:
+def grid_decarbonization(trajectory: dict[int, float] | float | None = None, factor: float = 0.95) -> Intervention:
     """Create a grid decarbonization intervention.
 
-    trajectory: year -> grid_ghg_per_kwh values.
+    trajectory: year -> grid_ghg_per_kwh values (legacy dict form).
+    factor: annual retention factor (e.g. 0.95 = 5% annual reduction). Used to
+            generate a 10-year trajectory when trajectory dict is not provided.
     """
-    year_overrides = {int(y): {"grid_ghg_per_kwh": v} for y, v in trajectory.items()}
+    if isinstance(trajectory, dict):
+        year_overrides = {int(y): {"grid_ghg_per_kwh": v} for y, v in trajectory.items()}
+    else:
+        baseline_intensity = 0.369  # kg CO2e/kWh baseline
+        year_overrides = {
+            2024 + i: {"grid_ghg_per_kwh": baseline_intensity * (factor ** i)}
+            for i in range(10)
+        }
     return Intervention(
         name="grid_decarbonization",
         category=InterventionCategory.GRID_ENERGY,
@@ -139,12 +148,21 @@ def grid_decarbonization(trajectory: dict[int, float]) -> Intervention:
     )
 
 
-def battery_cost_reduction(trajectory: dict[int, float]) -> Intervention:
+def battery_cost_reduction(trajectory: dict[int, float] | float | None = None, factor: float = 0.95) -> Intervention:
     """Create a battery manufacturing decarbonization intervention.
 
-    trajectory: year -> production_battery_per_kwh values.
+    trajectory: year -> production_battery_per_kwh values (legacy dict form).
+    factor: annual retention factor (e.g. 0.95 = 5% annual reduction). Used to
+            generate a 10-year trajectory when trajectory dict is not provided.
     """
-    year_overrides = {y: {"production_battery_per_kwh": v} for y, v in trajectory.items()}
+    if isinstance(trajectory, dict):
+        year_overrides = {y: {"production_battery_per_kwh": v} for y, v in trajectory.items()}
+    else:
+        baseline_battery = 73.0  # kg CO2e/kWh baseline
+        year_overrides = {
+            2024 + i: {"production_battery_per_kwh": baseline_battery * (factor ** i)}
+            for i in range(10)
+        }
     return Intervention(
         name="battery_decarb",
         category=InterventionCategory.TECHNOLOGY,

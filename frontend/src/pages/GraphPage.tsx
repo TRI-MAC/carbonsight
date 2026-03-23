@@ -480,11 +480,19 @@ export default function GraphPage() {
     );
   }, [highlightMode, selectedNode, ancestors, descendants, setNodes, setEdges]);
 
-  // Fetch scenario names for trace selector
+  // Fetch scenario names for trace selector, auto-select baseline
   useEffect(() => {
     api
       .listScenarios()
-      .then((list) => setScenarioNames(list.map((s) => s.name)))
+      .then((list) => {
+        const names = list.map((s) => s.name);
+        setScenarioNames(names);
+        if (names.includes("baseline")) {
+          setSelectedTraceScenarios(["baseline"]);
+        } else if (names.length > 0) {
+          setSelectedTraceScenarios([names[0]]);
+        }
+      })
       .catch(() => setScenarioNames([]));
   }, []);
 
@@ -503,21 +511,35 @@ export default function GraphPage() {
       selectedTraceScenarios.map((scenario) =>
         api
           .getTrace(scenario, selectedNode.name)
-          .then((resp) => ({ scenario, resp }))
-          .catch(() => ({ scenario, resp: null })),
+          .then((resp) => ({ scenario, resp, error: null as string | null }))
+          .catch((e) => ({ scenario, resp: null, error: String(e) })),
       ),
     ).then((results) => {
       const responses: Record<string, TraceResponse> = {};
       let anySuccess = false;
-      for (const { scenario, resp } of results) {
+      let lastError: string | null = null;
+      for (const { scenario, resp, error } of results) {
         if (resp) {
           responses[scenario] = resp;
           anySuccess = true;
+        } else if (error) {
+          lastError = error;
         }
       }
       setTraceResponses(responses);
       if (!anySuccess && selectedTraceScenarios.length > 0) {
-        setTraceError("Run a scenario to see value traces");
+        if (lastError?.includes("DataFrame")) {
+          setTraceError(
+            "This node produces tabular data — trace chart not supported",
+          );
+        } else if (
+          lastError?.includes("not found in results") ||
+          lastError?.includes("No results")
+        ) {
+          setTraceError("Run a scenario first to see value traces");
+        } else {
+          setTraceError(lastError ?? "Could not load trace data");
+        }
       }
       setTraceLoading(false);
     });

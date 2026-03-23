@@ -6,6 +6,8 @@ comparison, graph introspection, provenance queries, and data export.
 
 from __future__ import annotations
 
+import threading
+import uuid
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
@@ -36,6 +38,7 @@ app.add_middleware(
 scenario_store = ScenarioStore()
 _graph: SimulationGraph | None = None
 _results_store: dict[str, Any] = {}
+_jobs: dict[str, dict[str, Any]] = {}  # job_id -> {status, scenario, mode, result, error}
 
 
 def get_graph() -> SimulationGraph:
@@ -124,19 +127,19 @@ INTERVENTION_CATALOG = [
     {
         "type": "grid_decarbonization",
         "category": InterventionCategory.GRID_ENERGY.value,
-        "description": "Grid carbon intensity trajectory override",
+        "description": "Grid carbon intensity reduction",
         "target_node": "grid_ghg_per_kwh",
         "params": [
-            {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
+            {"name": "factor", "type": "float", "default": 0.95, "min": 0.80, "max": 1.0},
         ],
     },
     {
         "type": "battery_cost_reduction",
         "category": InterventionCategory.TECHNOLOGY.value,
-        "description": "Battery production emissions trajectory",
+        "description": "Battery production emissions reduction",
         "target_node": "production_battery_per_kwh",
         "params": [
-            {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
+            {"name": "factor", "type": "float", "default": 0.95, "min": 0.80, "max": 1.0},
         ],
     },
     {
@@ -444,8 +447,8 @@ def delete_scenario(name: str):
 
 # --- Simulation Execution ---
 
-@app.post("/scenarios/{name}/run")
-def run_scenario(name: str, body: RunRequest):
+def _run_simulation_sync(name: str, body: RunRequest):
+    """Run simulation synchronously and return (result, summary) or raise."""
     try:
         scenario = scenario_store.get(name)
     except KeyError:
@@ -461,24 +464,18 @@ def run_scenario(name: str, body: RunRequest):
         uq_samples=body.uq_samples,
     )
 
-    # Resolve interventions to year_overrides
     year_overrides = None
     if scenario.interventions:
-        try:
-            intervention_objs = resolve_interventions(scenario.interventions)
-            year_overrides = resolve_year_overrides(
-                intervention_objs, list(range(body.start_year, body.start_year + body.num_years))
-            )
-        except ValueError as e:
-            raise HTTPException(status_code=400, detail=str(e))
+        intervention_objs = resolve_interventions(scenario.interventions)
+        year_overrides = resolve_year_overrides(
+            intervention_objs, list(range(body.start_year, body.start_year + body.num_years))
+        )
 
     engine = SimulationEngine(graph, config)
     result = engine.run(overrides=scenario.overrides, mode=mode, year_overrides=year_overrides)
 
-    # Store result for later retrieval
     _results_store[name] = result
 
-    # Serialize result summary
     summary = {
         "scenario": name,
         "mode": mode.value,
@@ -494,7 +491,6 @@ def run_scenario(name: str, body: RunRequest):
             if isinstance(value, (int, float, str, bool)):
                 year_outputs[node_name] = value
             elif isinstance(value, dict):
-                # Filter out numpy arrays for JSON serialization
                 year_outputs[node_name] = {
                     k: v for k, v in value.items()
                     if isinstance(v, (int, float, str, bool, list, dict))
@@ -502,6 +498,69 @@ def run_scenario(name: str, body: RunRequest):
         summary["outputs"][yr.year] = year_outputs
 
     return summary
+
+
+def _run_job_in_background(job_id: str, name: str, body: RunRequest):
+    """Background thread target for async simulation."""
+    try:
+        summary = _run_simulation_sync(name, body)
+        _jobs[job_id]["status"] = "completed"
+        _jobs[job_id]["result"] = summary
+    except Exception as e:
+        _jobs[job_id]["status"] = "failed"
+        _jobs[job_id]["error"] = str(e)
+
+
+@app.post("/scenarios/{name}/run")
+def run_scenario(name: str, body: RunRequest):
+    # Validate scenario exists
+    try:
+        scenario_store.get(name)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Scenario '{name}' not found")
+
+    # Validate interventions up front
+    scenario = scenario_store.get(name)
+    if scenario.interventions:
+        try:
+            resolve_interventions(scenario.interventions)
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
+
+    # Create job and run in background thread
+    job_id = str(uuid.uuid4())
+    _jobs[job_id] = {
+        "status": "running",
+        "scenario": name,
+        "mode": body.mode,
+    }
+
+    thread = threading.Thread(
+        target=_run_job_in_background,
+        args=(job_id, name, body),
+        daemon=True,
+    )
+    thread.start()
+
+    return {"job_id": job_id, "status": "running", "scenario": name, "mode": body.mode}
+
+
+@app.get("/jobs/{job_id}")
+def get_job_status(job_id: str):
+    job = _jobs.get(job_id)
+    if job is None:
+        raise HTTPException(status_code=404, detail=f"Job '{job_id}' not found")
+    response: dict[str, Any] = {
+        "job_id": job_id,
+        "status": job["status"],
+        "scenario": job["scenario"],
+        "mode": job["mode"],
+    }
+    if job["status"] == "completed":
+        response["result"] = job.get("result")
+    elif job["status"] == "failed":
+        response["error"] = job.get("error")
+    return response
 
 
 # --- Scenario Comparison ---

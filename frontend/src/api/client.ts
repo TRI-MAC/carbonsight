@@ -157,7 +157,7 @@ export const api = {
       method: "DELETE",
     }),
 
-  // Execution
+  // Execution (returns immediately with job_id, simulation runs in background)
   runScenario: (
     name: string,
     opts?: {
@@ -167,7 +167,7 @@ export const api = {
       uq_samples?: number;
     },
   ) =>
-    request<import("../types").RunResult>(
+    request<{ job_id: string; status: string; scenario: string; mode: string }>(
       `/scenarios/${encodeURIComponent(name)}/run`,
       {
         method: "POST",
@@ -179,6 +179,39 @@ export const api = {
         }),
       },
     ),
+
+  // Job polling
+  getJobStatus: (jobId: string) =>
+    request<{
+      job_id: string;
+      status: string;
+      scenario: string;
+      mode: string;
+      result?: import("../types").RunResult;
+      error?: string;
+    }>(`/jobs/${encodeURIComponent(jobId)}`),
+
+  pollJob: async (
+    jobId: string,
+    intervalMs = 1000,
+  ): Promise<{
+    status: string;
+    result?: import("../types").RunResult;
+    error?: string;
+  }> => {
+    while (true) {
+      const job = await request<{
+        job_id: string;
+        status: string;
+        result?: import("../types").RunResult;
+        error?: string;
+      }>(`/jobs/${encodeURIComponent(jobId)}`);
+      if (job.status === "completed" || job.status === "failed") {
+        return job;
+      }
+      await new Promise((r) => setTimeout(r, intervalMs));
+    }
+  },
 
   // Comparison
   compare: (baseline: string, interventions: string[]) =>
