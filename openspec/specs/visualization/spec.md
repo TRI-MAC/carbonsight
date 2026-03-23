@@ -21,22 +21,7 @@ The system SHALL provide an interactive DAG visualization showing all nodes and 
 
 ### Requirement: Scenario Configuration UI
 
-The system SHALL provide a user interface for creating and editing scenarios. Users MUST be able to: create a new scenario from the baseline defaults, select and configure interventions from the available taxonomy, override individual input node values or distributions, name and save scenarios for later comparison. The UI SHALL validate intervention parameters before accepting them.
-
-#### Scenario: Create a new scenario with interventions
-
-- **WHEN** a user creates a new scenario named "Aggressive EV Policy" and adds a $10,000 EV subsidy intervention and a ZEV mandate of 50% by year 7
-- **THEN** the system SHALL store the scenario configuration and make it available for execution and comparison
-
-#### Scenario: Edit an existing scenario
-
-- **WHEN** a user modifies the EV subsidy amount in a saved scenario from $10,000 to $7,500
-- **THEN** the system SHALL update the scenario configuration and mark any cached results as stale
-
-#### Scenario: Validate intervention parameters
-
-- **WHEN** a user enters a negative value for carbon price
-- **THEN** the UI SHALL display a validation error and prevent the scenario from being saved
+The system SHALL provide a three-column scenario builder interface for creating and editing scenarios. The left column lists saved scenarios, the center column provides accordion-based intervention controls with range sliders and causal path annotations, and the right column shows a live impact preview that auto-runs a deterministic simulation on slider changes. The previous dropdown-based category selection and number-only inputs are replaced.
 
 ### Requirement: Dashboard and Comparison Views
 

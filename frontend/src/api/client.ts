@@ -104,6 +104,7 @@ export const api = {
         type: string;
         category: string;
         description: string;
+        target_node: string;
         params: Array<{
           name: string;
           type: string;

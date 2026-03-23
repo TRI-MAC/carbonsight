@@ -97,6 +97,7 @@ INTERVENTION_CATALOG = [
         "type": "carbon_pricing",
         "category": InterventionCategory.POLICY.value,
         "description": "Carbon price applied to fuel costs",
+        "target_node": "gas_ghg_per_gallon",
         "params": [
             {"name": "price_per_tonne", "type": "float", "default": 50, "min": 10, "max": 500},
             {"name": "start_year", "type": "int", "default": 2024, "min": 2024, "max": 2034},
@@ -106,6 +107,7 @@ INTERVENTION_CATALOG = [
         "type": "ev_subsidy",
         "category": InterventionCategory.POLICY.value,
         "description": "EV purchase subsidy shifting powertrain mix",
+        "target_node": "powertrain_proportions",
         "params": [
             {"name": "proportion_shift", "type": "dict", "default": {"bev": 0.15}, "min": None, "max": None},
         ],
@@ -114,6 +116,7 @@ INTERVENTION_CATALOG = [
         "type": "vmt_reduction",
         "category": InterventionCategory.BEHAVIORAL.value,
         "description": "Reduce vehicle miles traveled",
+        "target_node": "adjusted_vmt",
         "params": [
             {"name": "factor", "type": "float", "default": 0.9, "min": 0.5, "max": 1.0},
         ],
@@ -122,6 +125,7 @@ INTERVENTION_CATALOG = [
         "type": "grid_decarbonization",
         "category": InterventionCategory.GRID_ENERGY.value,
         "description": "Grid carbon intensity trajectory override",
+        "target_node": "grid_ghg_per_kwh",
         "params": [
             {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
         ],
@@ -130,6 +134,7 @@ INTERVENTION_CATALOG = [
         "type": "battery_cost_reduction",
         "category": InterventionCategory.TECHNOLOGY.value,
         "description": "Battery production emissions trajectory",
+        "target_node": "production_battery_per_kwh",
         "params": [
             {"name": "trajectory", "type": "dict", "default": {}, "min": None, "max": None},
         ],
@@ -138,6 +143,7 @@ INTERVENTION_CATALOG = [
         "type": "scrappage_program",
         "category": InterventionCategory.POLICY.value,
         "description": "Accelerated scrappage for old vehicles",
+        "target_node": "post_scrappage",
         "params": [
             {"name": "age_threshold", "type": "int", "default": 15, "min": 5, "max": 25},
             {"name": "acceleration_factor", "type": "float", "default": 2.0, "min": 1.1, "max": 5.0},
@@ -149,6 +155,7 @@ INTERVENTION_CATALOG = [
         "type": "phev_charging_improvement",
         "category": InterventionCategory.BEHAVIORAL.value,
         "description": "Improve PHEV charging behavior",
+        "target_node": "fleet_usage_ghg",
         "params": [
             {"name": "charging_factor", "type": "float", "default": 0.85, "min": 0.5, "max": 1.0},
         ],
@@ -645,14 +652,28 @@ def get_node_trace(name: str, node_name: str):
 
     # Determine if scalar or dict-valued
     if isinstance(sample, dict):
-        fields = [k for k in sample.keys() if isinstance(sample[k], (int, float))]
-        field_values = {
-            field: [
-                float(v.get(field, 0)) if isinstance(v, dict) else 0.0
-                for v in raw_values
-            ]
-            for field in fields
-        }
+        # Flatten one level of nesting for small sub-dicts (e.g. by_powertrain)
+        flat_sample: dict = {}
+        for k, v in sample.items():
+            if isinstance(v, (int, float)):
+                flat_sample[k] = k
+            elif isinstance(v, dict) and len(v) <= 10:
+                if all(isinstance(sv, (int, float)) for sv in v.values()):
+                    for sub_k, sub_v in v.items():
+                        flat_sample[sub_k] = (k, sub_k)
+
+        fields = list(flat_sample.keys())
+        field_values = {}
+        for field, path in flat_sample.items():
+            vals = []
+            for rv in raw_values:
+                if not isinstance(rv, dict):
+                    vals.append(0.0)
+                elif isinstance(path, tuple):
+                    vals.append(float(rv.get(path[0], {}).get(path[1], 0)))
+                else:
+                    vals.append(float(rv.get(field, 0)))
+            field_values[field] = vals
         values = field_values[fields[0]] if fields else []
     else:
         fields = None

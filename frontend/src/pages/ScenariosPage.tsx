@@ -1,15 +1,16 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect } from "react";
 import Button from "../components/Button";
-import Card from "../components/Card";
-import NodeTraceChart from "../components/NodeTraceChart";
-import type { Trace } from "../components/NodeTraceChart";
+import CausalPathChips from "../components/CausalPathChips";
+import ImpactPreview from "../components/ImpactPreview";
+import { useAutoRun } from "../hooks/useAutoRun";
 import { api } from "../api/client";
-import type { ScenarioConfig, RunResult } from "../types";
+import type { ScenarioConfig, GraphNode } from "../types";
 
 interface CatalogItem {
   type: string;
   category: string;
   description: string;
+  target_node: string;
   params: Array<{
     name: string;
     type: string;
@@ -19,192 +20,73 @@ interface CatalogItem {
   }>;
 }
 
-interface CatalogParam {
-  name: string;
-  type: string;
-  default: unknown;
-  min: number | null;
-  max: number | null;
-}
-
-interface InterventionValue {
-  category: string;
-  name: string;
-  value: number;
-  unit: string;
-  min?: number;
-  max?: number;
-  catalogParams?: CatalogParam[];
-}
-
 interface ScenarioWithStatus extends ScenarioConfig {
   status?: "idle" | "running" | "completed" | "error";
-  runResult?: RunResult;
   error?: string;
 }
 
-const FALLBACK_CATEGORIES: Record<
-  string,
-  Array<{
-    name: string;
-    label: string;
-    unit: string;
-    min?: number;
-    max?: number;
-  }>
-> = {
-  Policy: [
-    { name: "carbon_pricing", label: "Carbon pricing", unit: "$/ton", min: 0 },
-    { name: "ev_subsidy", label: "EV subsidy", unit: "$", min: 0 },
-    {
-      name: "scrappage_program",
-      label: "Scrappage program",
-      unit: "factor",
-      min: 1,
-      max: 5,
-    },
-  ],
-  Technology: [
-    {
-      name: "battery_cost_reduction",
-      label: "Battery cost reduction",
-      unit: "%",
-      min: 0,
-      max: 100,
-    },
-  ],
-  Behavioral: [
-    {
-      name: "vmt_reduction",
-      label: "VMT reduction",
-      unit: "factor",
-      min: 0.5,
-      max: 1.0,
-    },
-    {
-      name: "phev_charging_improvement",
-      label: "PHEV charging improvement",
-      unit: "factor",
-      min: 0.5,
-      max: 1.0,
-    },
-  ],
-  "Grid/Energy": [
-    {
-      name: "grid_decarbonization",
-      label: "Grid decarbonization",
-      unit: "trajectory",
-      min: 0,
-      max: 1,
-    },
-  ],
-};
-
-function catalogToCategories(catalog: CatalogItem[]): Record<
-  string,
-  Array<{
-    name: string;
-    label: string;
-    unit: string;
-    min?: number;
-    max?: number;
-    catalogParams?: CatalogParam[];
-  }>
-> {
-  const categories: Record<
-    string,
-    Array<{
-      name: string;
-      label: string;
-      unit: string;
-      min?: number;
-      max?: number;
-      catalogParams?: CatalogParam[];
-    }>
-  > = {};
-  for (const item of catalog) {
-    const cat = item.category
-      .replace(/_/g, "/")
-      .replace(/\b\w/g, (c) => c.toUpperCase());
-    if (!categories[cat]) categories[cat] = [];
-    const mainParam = item.params[0];
-    categories[cat].push({
-      name: item.type,
-      label: item.description,
-      unit:
-        mainParam?.type === "float"
-          ? mainParam.name.includes("factor")
-            ? "factor"
-            : "value"
-          : "value",
-      min: mainParam?.min ?? undefined,
-      max: mainParam?.max ?? undefined,
-      catalogParams: item.params,
-    });
-  }
-  return categories;
+interface InterventionValues {
+  [paramName: string]: number;
 }
 
+const PARAM_LABELS: Record<string, string> = {
+  price_per_tonne: "Carbon Price ($/tonne)",
+  start_year: "Start Year",
+  proportion_shift: "BEV Purchase Shift",
+  factor: "VMT Factor",
+  trajectory: "Intensity Factor",
+  age_threshold: "Age Threshold",
+  acceleration_factor: "Acceleration Factor",
+  duration_years: "Duration (Years)",
+  charging_factor: "Charging Factor",
+};
+
 export default function ScenariosPage() {
+  // Scenario list state
   const [scenarios, setScenarios] = useState<ScenarioWithStatus[]>([]);
   const [selectedScenario, setSelectedScenario] =
     useState<ScenarioWithStatus | null>(null);
   const [isNewScenario, setIsNewScenario] = useState(false);
-  const [demoMode, setDemoMode] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [interventionCategories, setInterventionCategories] = useState<
-    Record<
-      string,
-      Array<{
-        name: string;
-        label: string;
-        unit: string;
-        min?: number;
-        max?: number;
-        catalogParams?: CatalogParam[];
-      }>
-    >
-  >(FALLBACK_CATEGORIES);
+  const [demoMode, setDemoMode] = useState(false);
 
-  // Form state
+  // Intervention state
   const [scenarioName, setScenarioName] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string>("Policy");
-  const [interventions, setInterventions] = useState<
-    Record<string, InterventionValue>
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [graphNodes, setGraphNodes] = useState<GraphNode[]>([]);
+  const [enabledInterventions, setEnabledInterventions] = useState<
+    Record<string, InterventionValues>
   >({});
-  const [customOverrides, setCustomOverrides] = useState<
-    Array<{ key: string; value: string }>
-  >([{ key: "", value: "" }]);
+  const [expandedCategories, setExpandedCategories] = useState<
+    Record<string, boolean>
+  >({});
   const [runMode, setRunMode] = useState<"deterministic" | "uq">(
     "deterministic",
   );
-  const [numYears, setNumYears] = useState(10);
-  const [traceNode, setTraceNode] = useState<string | null>(null);
-  const [traceField, setTraceField] = useState<string | null>(null);
 
-  // Load scenarios on mount
+  // Auto-run
+  const autoRun = useAutoRun(scenarioName);
+
+  // Load scenarios, catalog, and graph on mount
   useEffect(() => {
-    loadScenarios();
+    loadData();
   }, []);
 
-  async function loadScenarios() {
+  async function loadData() {
+    setLoading(true);
     try {
-      setLoading(true);
-      const [data, catalog] = await Promise.all([
+      const [scenarioList, interventionCatalog, nodes] = await Promise.all([
         api.listScenarios(),
-        api.listInterventions().catch(() => null),
+        api.listInterventions().catch(() => []),
+        api.listNodes().catch(() => []),
       ]);
-      const scenariosWithStatus: ScenarioWithStatus[] = data.map((s) => ({
-        ...s,
-        status: "idle" as const,
-      }));
-      setScenarios(scenariosWithStatus);
-      if (catalog) {
-        setInterventionCategories(catalogToCategories(catalog));
-      }
+      setScenarios(
+        scenarioList.map((s) => ({ ...s, status: "idle" as const })),
+      );
+      setCatalog(interventionCatalog as CatalogItem[]);
+      setGraphNodes(nodes);
       setDemoMode(false);
-    } catch (error) {
-      console.warn("API unavailable, using demo mode:", error);
+    } catch {
       setDemoMode(true);
       setScenarios([]);
     } finally {
@@ -212,110 +94,99 @@ export default function ScenariosPage() {
     }
   }
 
+  // Group catalog by category
+  const categories = catalog.reduce(
+    (acc, item) => {
+      const cat = item.category
+        .replace(/_/g, "/")
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(item);
+      return acc;
+    },
+    {} as Record<string, CatalogItem[]>,
+  );
+
   function handleNewScenario() {
     setIsNewScenario(true);
     setSelectedScenario(null);
     setScenarioName("");
-    setInterventions({});
-    setCustomOverrides([{ key: "", value: "" }]);
-    setRunMode("deterministic");
-    setNumYears(10);
+    setEnabledInterventions({});
   }
 
   function handleSelectScenario(scenario: ScenarioWithStatus) {
     setIsNewScenario(false);
     setSelectedScenario(scenario);
     setScenarioName(scenario.name);
-
-    // Parse overrides into interventions
-    const parsed: Record<string, InterventionValue> = {};
-    Object.entries(scenario.overrides).forEach(([key, value]) => {
-      // Find matching intervention
-      for (const [category, interventionList] of Object.entries(
-        interventionCategories,
-      )) {
-        const intervention = interventionList.find((i) => i.name === key);
-        if (intervention) {
-          parsed[key] = {
-            category,
-            name: key,
-            value: Number(value),
-            unit: intervention.unit,
-            min: intervention.min,
-            max: intervention.max,
-          };
-        }
-      }
-    });
-    setInterventions(parsed);
-
-    // Custom overrides
-    const customKeys = Object.keys(scenario.overrides).filter((key) => {
-      return !Object.values(interventionCategories)
-        .flat()
-        .some((i) => i.name === key);
-    });
-    if (customKeys.length > 0) {
-      setCustomOverrides(
-        customKeys.map((key) => ({
-          key,
-          value: String(scenario.overrides[key]),
-        })),
-      );
-    } else {
-      setCustomOverrides([{ key: "", value: "" }]);
+    // TODO: parse existing overrides into enabledInterventions
+    setEnabledInterventions({});
+    // Trigger preview for existing scenarios
+    if (scenario.name !== "baseline") {
+      autoRun.trigger();
     }
   }
 
-  function handleInterventionChange(
-    category: string,
-    name: string,
+  async function handleDeleteScenario() {
+    if (!selectedScenario) return;
+    if (!confirm(`Delete scenario "${selectedScenario.name}"?`)) return;
+    try {
+      await api.deleteScenario(selectedScenario.name);
+      await loadData();
+      setSelectedScenario(null);
+      setIsNewScenario(false);
+    } catch {
+      if (demoMode) {
+        setScenarios((prev) =>
+          prev.filter((s) => s.name !== selectedScenario.name),
+        );
+        setSelectedScenario(null);
+      }
+    }
+  }
+
+  function toggleIntervention(item: CatalogItem) {
+    setEnabledInterventions((prev) => {
+      if (prev[item.type]) {
+        const copy = { ...prev };
+        delete copy[item.type];
+        return copy;
+      }
+      // Initialize with defaults
+      const defaults: InterventionValues = {};
+      for (const p of item.params) {
+        if (typeof p.default === "number") {
+          defaults[p.name] = p.default;
+        } else if (
+          p.type === "dict" &&
+          p.default &&
+          typeof p.default === "object"
+        ) {
+          // For dict types like proportion_shift: {bev: 0.15}, expose the first numeric value
+          const vals = Object.values(p.default as Record<string, unknown>);
+          defaults[p.name] = typeof vals[0] === "number" ? vals[0] : 0;
+        } else {
+          defaults[p.name] = 0;
+        }
+      }
+      return { ...prev, [item.type]: defaults };
+    });
+    // Trigger auto-run after change
+    setTimeout(() => autoRun.trigger(), 50);
+  }
+
+  function handleParamChange(
+    interventionType: string,
+    paramName: string,
     value: number,
-    unit: string,
-    min?: number,
-    max?: number,
-    catalogParams?: CatalogParam[],
   ) {
-    setInterventions((prev) => ({
+    setEnabledInterventions((prev) => ({
       ...prev,
-      [name]: {
-        category,
-        name,
-        value,
-        unit,
-        min,
-        max,
-        catalogParams: catalogParams ?? prev[name]?.catalogParams,
+      [interventionType]: {
+        ...prev[interventionType],
+        [paramName]: value,
       },
     }));
-  }
-
-  function handleRemoveIntervention(name: string) {
-    setInterventions((prev) => {
-      const copy = { ...prev };
-      delete copy[name];
-      return copy;
-    });
-  }
-
-  function handleCustomOverrideChange(
-    index: number,
-    field: "key" | "value",
-    value: string,
-  ) {
-    setCustomOverrides((prev) => {
-      const copy = [...prev];
-      copy[index][field] = value;
-      return copy;
-    });
-  }
-
-  function handleAddCustomOverride() {
-    setCustomOverrides((prev) => [...prev, { key: "", value: "" }]);
-  }
-
-  function handleRemoveCustomOverride(index: number) {
-    setCustomOverrides((prev) => prev.filter((_, i) => i !== index));
+    autoRun.trigger();
   }
 
   async function handleSaveScenario() {
@@ -324,207 +195,74 @@ export default function ScenariosPage() {
       return;
     }
 
-    // Build structured intervention specs using catalog param names
-    const interventionSpecs = Object.values(interventions).map((iv) => {
-      const paramName = iv.catalogParams?.[0]?.name ?? "value";
-      const paramType = iv.catalogParams?.[0]?.type;
-      // Dict params like ev_subsidy's proportion_shift need special wrapping
-      const paramValue =
-        paramType === "dict" && iv.name === "ev_subsidy"
-          ? { bev: iv.value }
-          : iv.value;
-      return { type: iv.name, params: { [paramName]: paramValue } };
-    });
-
-    // Custom overrides go as raw overrides
-    const overrides: Record<string, unknown> = {};
-    customOverrides.forEach(({ key, value }) => {
-      if (key.trim() && value.trim()) {
-        try {
-          overrides[key] = JSON.parse(value);
-        } catch {
-          overrides[key] = value;
+    const interventionSpecs = Object.entries(enabledInterventions).map(
+      ([type, values]) => {
+        const item = catalog.find((c) => c.type === type);
+        const params: Record<string, unknown> = {};
+        for (const p of item?.params ?? []) {
+          if (p.type === "dict" && p.name === "proportion_shift") {
+            params[p.name] = { bev: values[p.name] ?? 0 };
+          } else {
+            params[p.name] = values[p.name] ?? p.default;
+          }
         }
-      }
-    });
+        return { type, params };
+      },
+    );
 
     try {
       if (isNewScenario) {
         await api.createScenario({
           name: scenarioName,
-          overrides,
+          overrides: {},
           metadata: {},
           interventions: interventionSpecs,
         });
       } else {
         await api.updateScenario(scenarioName, {
-          overrides,
+          overrides: {},
           metadata: {},
           interventions: interventionSpecs,
         });
       }
-      await loadScenarios();
+      await loadData();
       setIsNewScenario(false);
     } catch (error) {
-      if (demoMode) {
-        // In demo mode, just add to local state
-        const newScenario: ScenarioWithStatus = {
-          name: scenarioName,
-          overrides,
-          metadata: {},
-          status: "idle",
-        };
-        if (isNewScenario) {
-          setScenarios((prev) => [...prev, newScenario]);
-        } else {
-          setScenarios((prev) =>
-            prev.map((s) => (s.name === scenarioName ? newScenario : s)),
-          );
-        }
-        setSelectedScenario(newScenario);
-        setIsNewScenario(false);
-      } else {
-        alert(`Failed to save scenario: ${error}`);
-      }
-    }
-  }
-
-  async function handleDeleteScenario() {
-    if (!selectedScenario) return;
-    if (
-      !confirm(
-        `Are you sure you want to delete scenario "${selectedScenario.name}"?`,
-      )
-    ) {
-      return;
-    }
-
-    try {
-      await api.deleteScenario(selectedScenario.name);
-      await loadScenarios();
-      setSelectedScenario(null);
-      setIsNewScenario(false);
-    } catch (error) {
-      if (demoMode) {
-        setScenarios((prev) =>
-          prev.filter((s) => s.name !== selectedScenario.name),
-        );
-        setSelectedScenario(null);
-        setIsNewScenario(false);
-      } else {
-        alert(`Failed to delete scenario: ${error}`);
-      }
+      if (!demoMode) alert(`Failed to save: ${error}`);
     }
   }
 
   async function handleRunScenario() {
-    if (!scenarioName.trim()) {
-      alert("Please save the scenario before running");
-      return;
-    }
-
-    // Update status
-    setScenarios((prev) =>
-      prev.map((s) =>
-        s.name === scenarioName ? { ...s, status: "running" as const } : s,
-      ),
-    );
-
-    if (selectedScenario) {
-      setSelectedScenario({ ...selectedScenario, status: "running" });
-    }
-
+    if (!scenarioName.trim()) return;
+    await handleSaveScenario();
     try {
-      const result = await api.runScenario(scenarioName, {
+      setScenarios((prev) =>
+        prev.map((s) =>
+          s.name === scenarioName ? { ...s, status: "running" as const } : s,
+        ),
+      );
+      await api.runScenario(scenarioName, {
         mode: runMode,
-        num_years: numYears,
+        num_years: 10,
         uq_samples: runMode === "uq" ? 1000 : undefined,
       });
-
       setScenarios((prev) =>
         prev.map((s) =>
-          s.name === scenarioName
-            ? { ...s, status: "completed" as const, runResult: result }
-            : s,
+          s.name === scenarioName ? { ...s, status: "completed" as const } : s,
         ),
       );
-
-      if (selectedScenario) {
-        setSelectedScenario({
-          ...selectedScenario,
-          status: "completed",
-          runResult: result,
-        });
-      }
     } catch (error) {
-      const errorMsg = String(error);
       setScenarios((prev) =>
         prev.map((s) =>
           s.name === scenarioName
-            ? { ...s, status: "error" as const, error: errorMsg }
+            ? { ...s, status: "error" as const, error: String(error) }
             : s,
         ),
       );
-
-      if (selectedScenario) {
-        setSelectedScenario({
-          ...selectedScenario,
-          status: "error",
-          error: errorMsg,
-        });
-      }
     }
   }
 
-  // Extract node list and trace from run result
-  const runResult = selectedScenario?.runResult ?? null;
-  const nodeNames = useMemo(() => {
-    if (!runResult) return [];
-    const firstYear = runResult.years[0];
-    const outputs = runResult.outputs[firstYear];
-    return outputs ? Object.keys(outputs).sort() : [];
-  }, [runResult]);
-
-  const traceFields = useMemo(() => {
-    if (!runResult || !traceNode) return null;
-    const firstYear = runResult.years[0];
-    const val = runResult.outputs[firstYear]?.[traceNode];
-    if (val && typeof val === "object" && !Array.isArray(val)) {
-      return Object.keys(val as Record<string, number>);
-    }
-    return null;
-  }, [runResult, traceNode]);
-
-  const traceData: Trace | null = useMemo(() => {
-    if (!runResult || !traceNode) return null;
-    const years = runResult.years;
-    const values = years.map((yr) => {
-      const val = runResult.outputs[yr]?.[traceNode];
-      if (val === undefined || val === null) return 0;
-      if (typeof val === "number") return val;
-      if (typeof val === "object" && !Array.isArray(val)) {
-        const dict = val as Record<string, number>;
-        const field = traceField ?? traceFields?.[0] ?? null;
-        return field ? (dict[field] ?? 0) : 0;
-      }
-      return 0;
-    });
-    return { scenario: selectedScenario?.name ?? "", years, values };
-  }, [runResult, traceNode, traceField, traceFields, selectedScenario]);
-
-  // Reset trace field when node changes
-  useEffect(() => {
-    setTraceField(null);
-  }, [traceNode]);
-
-  const activeScenario = isNewScenario
-    ? {
-        name: scenarioName,
-        overrides: {},
-        metadata: {},
-        status: "idle" as const,
-      }
-    : selectedScenario;
+  const hasActiveScenario = isNewScenario || selectedScenario != null;
 
   return (
     <div
@@ -536,28 +274,28 @@ export default function ScenariosPage() {
         fontFamily: "var(--font-body)",
       }}
     >
-      {/* Left Panel - Scenario List */}
+      {/* Left Column: Scenario List */}
       <div
         style={{
-          width: 300,
+          width: 200,
           borderRight: "1px solid var(--border-subtle)",
           display: "flex",
           flexDirection: "column",
           background: "var(--bg-surface)",
+          flexShrink: 0,
         }}
       >
         <div
           style={{
-            padding: "16px",
+            padding: 12,
             borderBottom: "1px solid var(--border-subtle)",
           }}
         >
           <h2
             style={{
-              fontSize: 16,
+              fontSize: 14,
               fontWeight: 600,
-              marginBottom: 12,
-              color: "var(--text-primary)",
+              marginBottom: 8,
             }}
           >
             Scenarios
@@ -565,23 +303,23 @@ export default function ScenariosPage() {
           <Button
             variant="primary"
             onClick={handleNewScenario}
-            style={{ width: "100%" }}
+            style={{ width: "100%", fontSize: 12 }}
           >
             + New Scenario
           </Button>
           {demoMode && (
             <div
               style={{
-                marginTop: 8,
-                padding: "6px 10px",
+                marginTop: 6,
+                padding: "4px 8px",
                 background: "rgba(251, 191, 36, 0.1)",
                 border: "1px solid rgba(251, 191, 36, 0.3)",
                 borderRadius: "var(--radius-md)",
-                fontSize: 11,
+                fontSize: 10,
                 color: "#fbbf24",
               }}
             >
-              Demo Mode: API unavailable
+              Demo Mode
             </div>
           )}
         </div>
@@ -589,9 +327,9 @@ export default function ScenariosPage() {
           {loading ? (
             <div
               style={{
-                padding: 16,
+                padding: 12,
                 color: "var(--text-muted)",
-                fontSize: 13,
+                fontSize: 12,
               }}
             >
               Loading...
@@ -599,12 +337,12 @@ export default function ScenariosPage() {
           ) : scenarios.length === 0 ? (
             <div
               style={{
-                padding: 16,
+                padding: 12,
                 color: "var(--text-muted)",
-                fontSize: 13,
+                fontSize: 12,
               }}
             >
-              No scenarios yet. Create one to get started.
+              No scenarios yet.
             </div>
           ) : (
             scenarios.map((scenario) => (
@@ -612,39 +350,35 @@ export default function ScenariosPage() {
                 key={scenario.name}
                 onClick={() => handleSelectScenario(scenario)}
                 style={{
-                  padding: "12px 16px",
+                  padding: "10px 12px",
                   borderBottom: "1px solid var(--border-subtle)",
                   cursor: "pointer",
                   background:
                     selectedScenario?.name === scenario.name
                       ? "var(--bg-elevated)"
                       : "transparent",
-                  transition: "background 0.15s ease",
                 }}
                 onMouseEnter={(e) => {
-                  if (selectedScenario?.name !== scenario.name) {
+                  if (selectedScenario?.name !== scenario.name)
                     e.currentTarget.style.background = "var(--bg-hover)";
-                  }
                 }}
                 onMouseLeave={(e) => {
-                  if (selectedScenario?.name !== scenario.name) {
+                  if (selectedScenario?.name !== scenario.name)
                     e.currentTarget.style.background = "transparent";
-                  }
                 }}
               >
                 <div
                   style={{
-                    fontSize: 13,
+                    fontSize: 12,
                     fontWeight: 500,
-                    color: "var(--text-primary)",
-                    marginBottom: 4,
+                    marginBottom: 2,
                   }}
                 >
                   {scenario.name}
                 </div>
                 <div
                   style={{
-                    fontSize: 11,
+                    fontSize: 10,
                     color:
                       scenario.status === "completed"
                         ? "var(--accent-green)"
@@ -667,15 +401,18 @@ export default function ScenariosPage() {
         </div>
       </div>
 
-      {/* Right Panel - Scenario Editor */}
+      {/* Center Column: Intervention Controls */}
       <div
         style={{
-          flex: 1,
+          width: 380,
+          borderRight: "1px solid var(--border-subtle)",
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
           overflow: "auto",
-          padding: 24,
         }}
       >
-        {!activeScenario ? (
+        {!hasActiveScenario ? (
           <div
             style={{
               display: "flex",
@@ -683,17 +420,298 @@ export default function ScenariosPage() {
               justifyContent: "center",
               height: "100%",
               color: "var(--text-muted)",
-              fontSize: 14,
+              fontSize: 13,
+              padding: 24,
             }}
           >
             Select a scenario or create a new one
           </div>
         ) : (
-          <div style={{ maxWidth: 800 }}>
-            <Card
-              title="Scenario Configuration"
-              actions={
-                !isNewScenario && (
+          <div
+            style={{
+              padding: 16,
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+            }}
+          >
+            {/* Scenario name */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  marginBottom: 4,
+                }}
+              >
+                Scenario Name
+              </label>
+              <input
+                type="text"
+                value={scenarioName}
+                onChange={(e) => setScenarioName(e.target.value)}
+                disabled={!isNewScenario}
+                placeholder="Enter scenario name"
+                style={{
+                  width: "100%",
+                  padding: "6px 10px",
+                  background: isNewScenario
+                    ? "var(--bg-primary)"
+                    : "var(--bg-elevated)",
+                  border: "1px solid var(--border-default)",
+                  borderRadius: "var(--radius-md)",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                  fontFamily: "var(--font-body)",
+                  opacity: isNewScenario ? 1 : 0.6,
+                  boxSizing: "border-box",
+                }}
+              />
+            </div>
+
+            {/* Intervention categories */}
+            <div>
+              <label
+                style={{
+                  display: "block",
+                  fontSize: 11,
+                  fontWeight: 500,
+                  color: "var(--text-secondary)",
+                  marginBottom: 8,
+                }}
+              >
+                Interventions
+              </label>
+              {Object.entries(categories).map(([catName, items]) => (
+                <div
+                  key={catName}
+                  style={{
+                    marginBottom: 8,
+                    border: "1px solid var(--border-subtle)",
+                    borderRadius: "var(--radius-md)",
+                    overflow: "hidden",
+                  }}
+                >
+                  {/* Category header */}
+                  <div
+                    onClick={() =>
+                      setExpandedCategories((prev) => ({
+                        ...prev,
+                        [catName]: !prev[catName],
+                      }))
+                    }
+                    style={{
+                      padding: "8px 12px",
+                      background: "var(--bg-surface)",
+                      cursor: "pointer",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      color: "var(--text-primary)",
+                    }}
+                  >
+                    {catName}
+                    <span style={{ fontSize: 10, color: "var(--text-muted)" }}>
+                      {expandedCategories[catName] ? "\u25B2" : "\u25BC"}
+                    </span>
+                  </div>
+
+                  {/* Category items */}
+                  {expandedCategories[catName] && (
+                    <div style={{ padding: "8px 12px" }}>
+                      {items.map((item) => {
+                        const isActive = !!enabledInterventions[item.type];
+                        return (
+                          <div
+                            key={item.type}
+                            style={{
+                              marginBottom: 12,
+                              padding: "8px 10px",
+                              background: isActive
+                                ? "var(--bg-elevated)"
+                                : "var(--bg-primary)",
+                              borderRadius: "var(--radius-md)",
+                              border: isActive
+                                ? "1px solid var(--accent-blue)"
+                                : "1px solid var(--border-subtle)",
+                            }}
+                          >
+                            {/* Checkbox + label */}
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                cursor: "pointer",
+                              }}
+                              onClick={() => toggleIntervention(item)}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isActive}
+                                readOnly
+                                style={{ cursor: "pointer" }}
+                              />
+                              <span style={{ fontSize: 12, flex: 1 }}>
+                                {item.description}
+                              </span>
+                            </div>
+
+                            {/* Params */}
+                            {isActive && (
+                              <div style={{ marginTop: 8 }}>
+                                {item.params.map((p) => {
+                                  const val =
+                                    enabledInterventions[item.type]?.[p.name] ??
+                                    0;
+                                  const hasRange =
+                                    p.min != null && p.max != null;
+                                  return (
+                                    <div
+                                      key={p.name}
+                                      style={{ marginBottom: 6 }}
+                                    >
+                                      <div
+                                        style={{
+                                          fontSize: 10,
+                                          color: "var(--text-muted)",
+                                          marginBottom: 3,
+                                        }}
+                                      >
+                                        {PARAM_LABELS[p.name] ?? p.name}
+                                      </div>
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          alignItems: "center",
+                                          gap: 8,
+                                        }}
+                                      >
+                                        {hasRange && (
+                                          <input
+                                            type="range"
+                                            min={p.min!}
+                                            max={p.max!}
+                                            step={
+                                              p.type === "int"
+                                                ? 1
+                                                : (p.max! - p.min!) / 100
+                                            }
+                                            value={val}
+                                            onChange={(e) =>
+                                              handleParamChange(
+                                                item.type,
+                                                p.name,
+                                                Number(e.target.value),
+                                              )
+                                            }
+                                            style={{ flex: 1 }}
+                                          />
+                                        )}
+                                        <input
+                                          type="number"
+                                          value={val}
+                                          onChange={(e) =>
+                                            handleParamChange(
+                                              item.type,
+                                              p.name,
+                                              Number(e.target.value),
+                                            )
+                                          }
+                                          min={p.min ?? undefined}
+                                          max={p.max ?? undefined}
+                                          step={p.type === "int" ? 1 : 0.01}
+                                          style={{
+                                            width: hasRange ? 70 : "100%",
+                                            padding: "3px 6px",
+                                            background: "var(--bg-primary)",
+                                            border:
+                                              "1px solid var(--border-default)",
+                                            borderRadius: "var(--radius-md)",
+                                            color: "var(--text-primary)",
+                                            fontSize: 12,
+                                            fontFamily: "var(--font-mono)",
+                                          }}
+                                        />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Causal path */}
+                                <CausalPathChips
+                                  targetNode={item.target_node}
+                                  graphNodes={graphNodes}
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Run settings + actions */}
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 8,
+                paddingTop: 8,
+                borderTop: "1px solid var(--border-subtle)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <label
+                  style={{
+                    fontSize: 11,
+                    color: "var(--text-secondary)",
+                  }}
+                >
+                  Run Mode:
+                </label>
+                <select
+                  value={runMode}
+                  onChange={(e) =>
+                    setRunMode(e.target.value as "deterministic" | "uq")
+                  }
+                  style={{
+                    padding: "4px 8px",
+                    background: "var(--bg-primary)",
+                    border: "1px solid var(--border-default)",
+                    borderRadius: "var(--radius-md)",
+                    color: "var(--text-primary)",
+                    fontSize: 12,
+                  }}
+                >
+                  <option value="deterministic">Deterministic</option>
+                  <option value="uq">UQ (Monte Carlo)</option>
+                </select>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleSaveScenario}
+                  style={{ flex: 1 }}
+                >
+                  {isNewScenario ? "Create" : "Save"}
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleRunScenario}
+                  style={{ flex: 1 }}
+                >
+                  Run {runMode === "uq" ? "(UQ)" : ""}
+                </Button>
+                {!isNewScenario && selectedScenario && (
                   <Button
                     variant="danger"
                     size="sm"
@@ -701,589 +719,21 @@ export default function ScenariosPage() {
                   >
                     Delete
                   </Button>
-                )
-              }
-            >
-              <div
-                style={{ display: "flex", flexDirection: "column", gap: 20 }}
-              >
-                {/* Name */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: "var(--text-secondary)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Scenario Name
-                  </label>
-                  <input
-                    type="text"
-                    value={scenarioName}
-                    onChange={(e) => setScenarioName(e.target.value)}
-                    disabled={!isNewScenario}
-                    placeholder="Enter scenario name"
-                    style={{
-                      width: "100%",
-                      padding: "8px 12px",
-                      background: isNewScenario
-                        ? "var(--bg-primary)"
-                        : "var(--bg-elevated)",
-                      border: "1px solid var(--border-default)",
-                      borderRadius: "var(--radius-md)",
-                      color: "var(--text-primary)",
-                      fontSize: 13,
-                      fontFamily: "var(--font-body)",
-                      opacity: isNewScenario ? 1 : 0.6,
-                    }}
-                  />
-                </div>
-
-                {/* Interventions */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: "var(--text-secondary)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Interventions
-                  </label>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 8,
-                      marginBottom: 12,
-                    }}
-                  >
-                    <select
-                      value={selectedCategory}
-                      onChange={(e) => setSelectedCategory(e.target.value)}
-                      style={{
-                        flex: 1,
-                        padding: "8px 12px",
-                        background: "var(--bg-primary)",
-                        border: "1px solid var(--border-default)",
-                        borderRadius: "var(--radius-md)",
-                        color: "var(--text-primary)",
-                        fontSize: 13,
-                        fontFamily: "var(--font-body)",
-                      }}
-                    >
-                      {Object.keys(interventionCategories).map((cat) => (
-                        <option key={cat} value={cat}>
-                          {cat}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Available Interventions */}
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 8,
-                      marginBottom: 12,
-                    }}
-                  >
-                    {(interventionCategories[selectedCategory] ?? []).map(
-                      (intervention) => {
-                        const isActive = interventions[intervention.name];
-                        return (
-                          <div
-                            key={intervention.name}
-                            style={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 8,
-                              padding: "8px 12px",
-                              background: isActive
-                                ? "var(--bg-elevated)"
-                                : "var(--bg-primary)",
-                              border: "1px solid var(--border-default)",
-                              borderRadius: "var(--radius-md)",
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={!!isActive}
-                              onChange={(e) => {
-                                if (e.target.checked) {
-                                  handleInterventionChange(
-                                    selectedCategory,
-                                    intervention.name,
-                                    0,
-                                    intervention.unit,
-                                    intervention.min,
-                                    intervention.max,
-                                    intervention.catalogParams,
-                                  );
-                                } else {
-                                  handleRemoveIntervention(intervention.name);
-                                }
-                              }}
-                              style={{ cursor: "pointer" }}
-                            />
-                            <label
-                              style={{
-                                flex: 1,
-                                fontSize: 13,
-                                color: "var(--text-primary)",
-                                cursor: "pointer",
-                              }}
-                              onClick={() => {
-                                if (isActive) {
-                                  handleRemoveIntervention(intervention.name);
-                                } else {
-                                  handleInterventionChange(
-                                    selectedCategory,
-                                    intervention.name,
-                                    0,
-                                    intervention.unit,
-                                    intervention.min,
-                                    intervention.max,
-                                    intervention.catalogParams,
-                                  );
-                                }
-                              }}
-                            >
-                              {intervention.label}
-                            </label>
-                            {isActive && (
-                              <>
-                                <input
-                                  type="number"
-                                  value={isActive.value}
-                                  onChange={(e) =>
-                                    handleInterventionChange(
-                                      selectedCategory,
-                                      intervention.name,
-                                      Number(e.target.value),
-                                      intervention.unit,
-                                      intervention.min,
-                                      intervention.max,
-                                    )
-                                  }
-                                  min={intervention.min}
-                                  max={intervention.max}
-                                  step={intervention.unit === "%" ? 1 : 0.1}
-                                  style={{
-                                    width: 80,
-                                    padding: "4px 8px",
-                                    background: "var(--bg-primary)",
-                                    border: "1px solid var(--border-default)",
-                                    borderRadius: "var(--radius-md)",
-                                    color: "var(--text-primary)",
-                                    fontSize: 13,
-                                    fontFamily: "var(--font-mono)",
-                                  }}
-                                />
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    color: "var(--text-muted)",
-                                    minWidth: 40,
-                                  }}
-                                >
-                                  {intervention.unit}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        );
-                      },
-                    )}
-                  </div>
-                </div>
-
-                {/* Custom Overrides */}
-                <div>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 12,
-                      fontWeight: 500,
-                      color: "var(--text-secondary)",
-                      marginBottom: 6,
-                    }}
-                  >
-                    Custom Node Overrides
-                  </label>
-                  <div
-                    style={{ display: "flex", flexDirection: "column", gap: 8 }}
-                  >
-                    {customOverrides.map((override, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          alignItems: "center",
-                        }}
-                      >
-                        <input
-                          type="text"
-                          value={override.key}
-                          onChange={(e) =>
-                            handleCustomOverrideChange(
-                              index,
-                              "key",
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Node name"
-                          style={{
-                            flex: 1,
-                            padding: "8px 12px",
-                            background: "var(--bg-primary)",
-                            border: "1px solid var(--border-default)",
-                            borderRadius: "var(--radius-md)",
-                            color: "var(--text-primary)",
-                            fontSize: 13,
-                            fontFamily: "var(--font-mono)",
-                          }}
-                        />
-                        <input
-                          type="text"
-                          value={override.value}
-                          onChange={(e) =>
-                            handleCustomOverrideChange(
-                              index,
-                              "value",
-                              e.target.value,
-                            )
-                          }
-                          placeholder="Value (JSON)"
-                          style={{
-                            flex: 1,
-                            padding: "8px 12px",
-                            background: "var(--bg-primary)",
-                            border: "1px solid var(--border-default)",
-                            borderRadius: "var(--radius-md)",
-                            color: "var(--text-primary)",
-                            fontSize: 13,
-                            fontFamily: "var(--font-mono)",
-                          }}
-                        />
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleRemoveCustomOverride(index)}
-                          disabled={customOverrides.length === 1}
-                        >
-                          ×
-                        </Button>
-                      </div>
-                    ))}
-                    <Button
-                      variant="secondary"
-                      size="sm"
-                      onClick={handleAddCustomOverride}
-                      style={{ alignSelf: "flex-start" }}
-                    >
-                      + Add Override
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Save Button */}
-                <div style={{ display: "flex", gap: 8 }}>
-                  <Button variant="primary" onClick={handleSaveScenario}>
-                    {isNewScenario ? "Create Scenario" : "Save Changes"}
-                  </Button>
-                </div>
+                )}
               </div>
-            </Card>
-
-            {/* Run Controls */}
-            {!isNewScenario && selectedScenario && (
-              <Card title="Run Simulation" style={{ marginTop: 20 }}>
-                <div
-                  style={{ display: "flex", flexDirection: "column", gap: 16 }}
-                >
-                  <div style={{ display: "flex", gap: 16 }}>
-                    <div style={{ flex: 1 }}>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Mode
-                      </label>
-                      <select
-                        value={runMode}
-                        onChange={(e) =>
-                          setRunMode(e.target.value as "deterministic" | "uq")
-                        }
-                        style={{
-                          width: "100%",
-                          padding: "8px 12px",
-                          background: "var(--bg-primary)",
-                          border: "1px solid var(--border-default)",
-                          borderRadius: "var(--radius-md)",
-                          color: "var(--text-primary)",
-                          fontSize: 13,
-                          fontFamily: "var(--font-body)",
-                        }}
-                      >
-                        <option value="deterministic">Deterministic</option>
-                        <option value="uq">Uncertainty Quantification</option>
-                      </select>
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <label
-                        style={{
-                          display: "block",
-                          fontSize: 12,
-                          fontWeight: 500,
-                          color: "var(--text-secondary)",
-                          marginBottom: 6,
-                        }}
-                      >
-                        Years
-                      </label>
-                      <input
-                        type="number"
-                        value={numYears}
-                        onChange={(e) => setNumYears(Number(e.target.value))}
-                        min={1}
-                        max={50}
-                        style={{
-                          width: "100%",
-                          padding: "8px 12px",
-                          background: "var(--bg-primary)",
-                          border: "1px solid var(--border-default)",
-                          borderRadius: "var(--radius-md)",
-                          color: "var(--text-primary)",
-                          fontSize: 13,
-                          fontFamily: "var(--font-mono)",
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="primary"
-                    onClick={handleRunScenario}
-                    disabled={selectedScenario.status === "running"}
-                  >
-                    {selectedScenario.status === "running"
-                      ? "Running..."
-                      : "Run Simulation"}
-                  </Button>
-
-                  {/* Run Results */}
-                  {selectedScenario.runResult && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        padding: 12,
-                        background: "var(--bg-primary)",
-                        border: "1px solid var(--border-default)",
-                        borderRadius: "var(--radius-md)",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 12,
-                          fontWeight: 600,
-                          color: "var(--text-primary)",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Run Summary
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: "var(--text-secondary)",
-                          display: "flex",
-                          flexDirection: "column",
-                          gap: 4,
-                        }}
-                      >
-                        <div>
-                          Mode:{" "}
-                          <strong>{selectedScenario.runResult.mode}</strong>
-                        </div>
-                        <div>
-                          Years:{" "}
-                          <strong>
-                            {selectedScenario.runResult.years.join(", ")}
-                          </strong>
-                        </div>
-                        <div>
-                          Runtime:{" "}
-                          <strong>
-                            {selectedScenario.runResult.wall_clock_seconds.toFixed(
-                              2,
-                            )}
-                            s
-                          </strong>
-                        </div>
-                        <div>
-                          Outputs:{" "}
-                          <strong>
-                            {
-                              Object.keys(
-                                selectedScenario.runResult.outputs[
-                                  selectedScenario.runResult.years[0]
-                                ] || {},
-                              ).length
-                            }{" "}
-                            nodes
-                          </strong>
-                        </div>
-                        {selectedScenario.runResult.performance_warning && (
-                          <div
-                            style={{
-                              color: "var(--accent-red)",
-                              marginTop: 4,
-                            }}
-                          >
-                            ⚠ Performance warning
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Node Trace */}
-                  {selectedScenario.runResult && nodeNames.length > 0 && (
-                    <Card title="Node Value Trace" style={{ marginTop: 20 }}>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 16,
-                        }}
-                      >
-                        <div
-                          style={{
-                            width: 180,
-                            maxHeight: 300,
-                            overflow: "auto",
-                            borderRight: "1px solid var(--border-subtle)",
-                            paddingRight: 12,
-                          }}
-                        >
-                          <div
-                            style={{
-                              fontSize: 11,
-                              color: "var(--text-muted)",
-                              textTransform: "uppercase",
-                              marginBottom: 8,
-                            }}
-                          >
-                            Nodes
-                          </div>
-                          {nodeNames.map((name) => (
-                            <div
-                              key={name}
-                              onClick={() => setTraceNode(name)}
-                              style={{
-                                padding: "6px 8px",
-                                fontSize: 12,
-                                fontFamily: "var(--font-mono)",
-                                cursor: "pointer",
-                                borderRadius: "var(--radius-sm)",
-                                background:
-                                  traceNode === name
-                                    ? "var(--bg-elevated)"
-                                    : "transparent",
-                                color:
-                                  traceNode === name
-                                    ? "var(--text-primary)"
-                                    : "var(--text-secondary)",
-                              }}
-                            >
-                              {name}
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ flex: 1 }}>
-                          {traceFields && (
-                            <div style={{ marginBottom: 12 }}>
-                              <select
-                                value={traceField ?? traceFields[0] ?? ""}
-                                onChange={(e) => setTraceField(e.target.value)}
-                                style={{
-                                  padding: "4px 8px",
-                                  background: "var(--bg-elevated)",
-                                  border: "1px solid var(--border-subtle)",
-                                  borderRadius: "var(--radius-sm)",
-                                  color: "var(--text-primary)",
-                                  fontSize: 12,
-                                  fontFamily: "var(--font-mono)",
-                                }}
-                              >
-                                {traceFields.map((f) => (
-                                  <option key={f} value={f}>
-                                    {f}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          )}
-                          {traceData ? (
-                            <NodeTraceChart
-                              traces={[traceData]}
-                              nodeName={traceNode ?? ""}
-                              fieldName={
-                                traceFields
-                                  ? (traceField ?? traceFields[0])
-                                  : undefined
-                              }
-                            />
-                          ) : (
-                            <div
-                              style={{
-                                display: "flex",
-                                justifyContent: "center",
-                                alignItems: "center",
-                                height: 200,
-                                color: "var(--text-muted)",
-                                fontSize: 13,
-                              }}
-                            >
-                              Select a node to view its trace
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-                  )}
-
-                  {selectedScenario.error && (
-                    <div
-                      style={{
-                        marginTop: 16,
-                        padding: 12,
-                        background: "rgba(248, 113, 113, 0.1)",
-                        border: "1px solid rgba(248, 113, 113, 0.3)",
-                        borderRadius: "var(--radius-md)",
-                        color: "var(--accent-red)",
-                        fontSize: 12,
-                      }}
-                    >
-                      <strong>Error:</strong> {selectedScenario.error}
-                    </div>
-                  )}
-                </div>
-              </Card>
-            )}
+            </div>
           </div>
         )}
+      </div>
+
+      {/* Right Column: Impact Preview */}
+      <div style={{ flex: 1, overflow: "auto" }}>
+        <ImpactPreview
+          data={autoRun.previewData}
+          scenarioName={scenarioName || "baseline"}
+          isRunning={autoRun.isRunning}
+          error={autoRun.error}
+        />
       </div>
     </div>
   );
