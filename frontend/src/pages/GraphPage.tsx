@@ -551,14 +551,31 @@ export default function GraphPage() {
     return first?.fields ?? null;
   }, [traceResponses]);
 
+  const UQ_BAND_KEYS = ["p5", "p25", "p75", "p95", "median"];
+
   const traces: Trace[] = useMemo(() => {
     return Object.entries(traceResponses).map(([scenario, resp]) => {
       let values = resp.values;
+      let bands: Record<string, number[]> | undefined;
+
       if (resp.fields && resp.field_values) {
-        const field = traceField ?? resp.fields[0];
-        values = resp.field_values[field] ?? resp.values;
+        // Check if this is UQ data (has p5/p95 fields)
+        const isUq = UQ_BAND_KEYS.every((k) => resp.fields!.includes(k));
+        if (isUq) {
+          // Use median as primary values, pass band data separately
+          values = resp.field_values["median"] ?? resp.values;
+          bands = {};
+          for (const k of UQ_BAND_KEYS) {
+            if (resp.field_values[k]) {
+              bands[k] = resp.field_values[k];
+            }
+          }
+        } else {
+          const field = traceField ?? resp.fields[0];
+          values = resp.field_values[field] ?? resp.values;
+        }
       }
-      return { scenario, years: resp.years, values };
+      return { scenario, years: resp.years, values, bands };
     });
   }, [traceResponses, traceField]);
 

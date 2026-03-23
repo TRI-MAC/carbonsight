@@ -788,10 +788,15 @@ def get_node_trace(name: str, node_name: str):
         )
 
     # Determine if scalar or dict-valued
+    is_uq = result.execution_mode == ExecutionMode.UQ
     if isinstance(sample, dict):
         # Flatten one level of nesting for small sub-dicts (e.g. by_powertrain)
+        # Skip numpy arrays (e.g. 'samples' from UQ runs)
+        import numpy as np
         flat_sample: dict = {}
         for k, v in sample.items():
+            if isinstance(v, np.ndarray):
+                continue  # skip raw sample arrays
             if isinstance(v, (int, float)):
                 flat_sample[k] = k
             elif isinstance(v, dict) and len(v) <= 10:
@@ -832,6 +837,7 @@ def get_node_trace(name: str, node_name: str):
         "values": values,
         "fields": fields,
         "field_values": field_values,
+        "mode": result.execution_mode.value,
     }
 
 

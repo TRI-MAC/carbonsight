@@ -1,6 +1,7 @@
 import {
-  LineChart,
+  ComposedChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -13,6 +14,8 @@ export interface Trace {
   scenario: string;
   years: number[];
   values: number[];
+  /** UQ band data keyed by stat name (p5, p25, p75, p95, median) */
+  bands?: Record<string, number[]>;
 }
 
 interface NodeTraceChartProps {
@@ -37,6 +40,10 @@ const tooltipStyle = {
   color: "#e8ecf4",
 };
 
+function hasUqBands(trace: Trace): boolean {
+  return !!(trace.bands && trace.bands.p5 && trace.bands.p95);
+}
+
 export default function NodeTraceChart({
   traces,
   nodeName,
@@ -59,17 +66,37 @@ export default function NodeTraceChart({
     );
   }
 
-  // Build chart data: one object per year with a key per scenario
+  const anyUq = traces.some(hasUqBands);
+
+  // Build chart data with band widths for stacking trick
+  // To render a band between p5 and p95, we store p5 as the invisible base
+  // and (p95 - p5) as the visible band height stacked on top
   const allYears = traces[0].years;
   const data = allYears.map((year, i) => {
     const point: Record<string, number> = { year };
     traces.forEach((t) => {
-      point[t.scenario] = t.values[i] ?? 0;
+      if (hasUqBands(t)) {
+        const p5 = t.bands!.p5[i];
+        const p25 = t.bands!.p25?.[i] ?? p5;
+        const p75 = t.bands!.p75?.[i] ?? t.bands!.p95[i];
+        const p95 = t.bands!.p95[i];
+        const median = t.bands!.median?.[i] ?? t.values[i] ?? 0;
+
+        point[t.scenario] = median;
+        // Outer band (90% CI): invisible base + visible range
+        point[`${t.scenario}_p5`] = p5;
+        point[`${t.scenario}_outer`] = p95 - p5;
+        // Inner band (50% CI): invisible base + visible range
+        point[`${t.scenario}_p25`] = p25;
+        point[`${t.scenario}_inner`] = p75 - p25;
+      } else {
+        point[t.scenario] = t.values[i] ?? 0;
+      }
     });
     return point;
   });
 
-  const showLegend = traces.length > 1;
+  const showLegend = traces.length > 1 || anyUq;
 
   return (
     <div>
@@ -88,9 +115,22 @@ export default function NodeTraceChart({
             / {fieldName}
           </span>
         )}
+        {anyUq && (
+          <span
+            style={{
+              marginLeft: 8,
+              fontSize: 10,
+              color: "var(--text-muted)",
+              fontWeight: 400,
+              fontStyle: "italic",
+            }}
+          >
+            shaded = 90% CI, dark = 50% CI
+          </span>
+        )}
       </div>
-      <ResponsiveContainer width="100%" height={250}>
-        <LineChart data={data}>
+      <ResponsiveContainer width="100%" height={anyUq ? 300 : 250}>
+        <ComposedChart data={data}>
           <CartesianGrid strokeDasharray="3 3" stroke="#1e293b" />
           <XAxis
             dataKey="year"
@@ -101,10 +141,86 @@ export default function NodeTraceChart({
             stroke="#556178"
             style={{ fontSize: 11, fontFamily: "JetBrains Mono" }}
           />
-          <Tooltip contentStyle={tooltipStyle} />
+          <Tooltip
+            contentStyle={tooltipStyle}
+            formatter={(value: number, name: string) => {
+              // Hide the invisible base areas from tooltip
+              if (name.endsWith("_p5") || name.endsWith("_p25")) return null;
+              if (name.endsWith("_outer"))
+                return [value.toFixed(2), "90% CI width"];
+              if (name.endsWith("_inner"))
+                return [value.toFixed(2), "50% CI width"];
+              return [value.toFixed(2), name];
+            }}
+          />
           {showLegend && (
-            <Legend wrapperStyle={{ fontSize: 12, color: "#8b95a8" }} />
+            <Legend
+              wrapperStyle={{ fontSize: 12, color: "#8b95a8" }}
+              payload={traces.map((t, i) => {
+                const color = COLORS[i % COLORS.length];
+                if (hasUqBands(t)) {
+                  return {
+                    value: `${t.scenario} (median + CI)`,
+                    type: "line",
+                    color,
+                  };
+                }
+                return { value: t.scenario, type: "line", color };
+              })}
+            />
           )}
+          {/* Render bands first (behind lines) */}
+          {traces.map((t, i) => {
+            if (!hasUqBands(t)) return null;
+            const color = COLORS[i % COLORS.length];
+            return [
+              // Outer band: invisible p5 base + visible p5→p95 range
+              <Area
+                key={`${t.scenario}_p5`}
+                type="monotone"
+                dataKey={`${t.scenario}_p5`}
+                stackId={`outer_${t.scenario}`}
+                stroke="none"
+                fill="transparent"
+                legendType="none"
+                tooltipType="none"
+              />,
+              <Area
+                key={`${t.scenario}_outer`}
+                type="monotone"
+                dataKey={`${t.scenario}_outer`}
+                stackId={`outer_${t.scenario}`}
+                stroke="none"
+                fill={color}
+                fillOpacity={0.1}
+                legendType="none"
+                tooltipType="none"
+              />,
+              // Inner band: invisible p25 base + visible p25→p75 range
+              <Area
+                key={`${t.scenario}_p25`}
+                type="monotone"
+                dataKey={`${t.scenario}_p25`}
+                stackId={`inner_${t.scenario}`}
+                stroke="none"
+                fill="transparent"
+                legendType="none"
+                tooltipType="none"
+              />,
+              <Area
+                key={`${t.scenario}_inner`}
+                type="monotone"
+                dataKey={`${t.scenario}_inner`}
+                stackId={`inner_${t.scenario}`}
+                stroke="none"
+                fill={color}
+                fillOpacity={0.25}
+                legendType="none"
+                tooltipType="none"
+              />,
+            ];
+          })}
+          {/* Render lines on top */}
           {traces.map((t, i) => (
             <Line
               key={t.scenario}
@@ -113,9 +229,10 @@ export default function NodeTraceChart({
               stroke={COLORS[i % COLORS.length]}
               strokeWidth={2}
               dot={false}
+              name={hasUqBands(t) ? `${t.scenario} (median)` : t.scenario}
             />
           ))}
-        </LineChart>
+        </ComposedChart>
       </ResponsiveContainer>
     </div>
   );

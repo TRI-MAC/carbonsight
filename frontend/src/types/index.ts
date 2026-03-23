@@ -81,4 +81,5 @@ export interface TraceResponse {
   values: number[];
   fields: string[] | null;
   field_values: Record<string, number[]> | null;
+  mode?: "deterministic" | "uq";
 }
