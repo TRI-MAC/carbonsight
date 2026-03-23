@@ -28,14 +28,15 @@ const DEMO_NODES: GraphNode[] = [
     description:
       "Age-based probability of a vehicle remaining in service. From Greene & Leard survival model.",
     data_source: {
-      name: "EPA Vehicle Survival Rates",
-      publication_date: "2023-11-01",
-      url: "https://www.epa.gov/",
+      name: "Greene, D.L. & Leard, B. (2015). Vehicle Survival and Scrappage Rates. ORNL.",
+      publication_date: "2015",
+      url: "https://doi.org/10.2172/1227092",
     },
     assumptions: [
       {
         description: "Weibull distribution parameters for vehicle lifetime",
-        rationale: "EPA survival curves based on historical registration data",
+        rationale:
+          "Greene & Leard survival model fitted to historical registration data",
         confidence: "medium",
       },
     ],
@@ -49,10 +50,11 @@ const DEMO_NODES: GraphNode[] = [
     tags: ["macro"],
     display_name: "Oil Price",
     description:
-      "Crude oil price projection from EIA Short-Term Energy Outlook.",
+      "Crude oil price projection. EIA Annual Energy Outlook 2024, Reference Case.",
     data_source: {
-      name: "EIA Short-Term Energy Outlook",
-      publication_date: "2024-01-10",
+      name: "EIA Annual Energy Outlook 2024, Table 12",
+      publication_date: "2024-03",
+      url: "https://www.eia.gov/outlooks/aeo/data/browser/#/?id=12-AEO2024",
     },
   },
   {
@@ -63,10 +65,12 @@ const DEMO_NODES: GraphNode[] = [
     temporal: [],
     tags: ["emissions", "macro"],
     display_name: "Grid Carbon Intensity",
-    description: "CO2 emitted per kWh of electricity from the grid.",
+    description:
+      "CO2 emitted per kWh of electricity from the US grid (~0.369 kg/kWh).",
     data_source: {
-      name: "IEA World Energy Outlook 2024",
-      publication_date: "2024-10-24",
+      name: "EIA Electric Power Annual, Table 9.1 (2023 data)",
+      publication_date: "2024-10",
+      url: "https://www.eia.gov/electricity/annual/",
     },
   },
   {
@@ -109,8 +113,9 @@ const DEMO_NODES: GraphNode[] = [
     description:
       "New vehicles entering the fleet this year by powertrain type.",
     data_source: {
-      name: "BloombergNEF EV Forecast",
-      publication_date: "2024-06-12",
+      name: "Bureau of Economic Analysis, Table 7.2.5S (2024)",
+      publication_date: "2024",
+      url: "https://www.bea.gov/data/consumer-spending/main",
     },
   },
   {

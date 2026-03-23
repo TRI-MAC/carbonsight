@@ -21,6 +21,7 @@ def run_and_wait(client, scenario_name: str, run_json: dict, timeout: float = 10
             return status
         time.sleep(0.05)
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
+from carbonsight.core.distributions import Distribution
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.core.node import Node, NodeType
 
@@ -194,6 +195,71 @@ class TestNodeTrace:
         response = client.get("/scenarios/baseline/trace/nonexistent_node")
         assert response.status_code == 404
         assert "not found in results" in response.json()["detail"]
+
+    def test_trace_includes_mode(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        run_and_wait(client, "baseline", {"mode": "deterministic", "num_years": 1})
+        response = client.get("/scenarios/baseline/trace/output")
+        assert response.json()["mode"] == "deterministic"
+
+
+class TestUQTrace:
+    """Verify UQ runs produce trace data with confidence band fields."""
+
+    @pytest.fixture(autouse=True)
+    def _uq_graph(self):
+        """Set up a graph with a distribution node for UQ testing."""
+        graph = SimulationGraph()
+        graph.add_node(Node(
+            name="grid_intensity",
+            node_type=NodeType.DISTRIBUTION,
+            value=Distribution.normal(mean=369, std=20),
+        ))
+        graph.add_node(Node(
+            name="emissions",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda grid_intensity: grid_intensity * 10,
+        ))
+        graph.validate()
+        set_graph(graph)
+
+    def test_uq_trace_returns_band_fields(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        job = run_and_wait(client, "baseline", {"mode": "uq", "num_years": 3})
+        assert job["status"] == "completed"
+
+        response = client.get("/scenarios/baseline/trace/emissions")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert data["mode"] == "uq"
+        assert data["fields"] is not None
+        # Must include all confidence band fields
+        for key in ["mean", "median", "p5", "p25", "p75", "p95", "std"]:
+            assert key in data["fields"], f"Missing field: {key}"
+            assert key in data["field_values"]
+            assert len(data["field_values"][key]) == 3
+
+    def test_uq_trace_bands_ordered(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        run_and_wait(client, "baseline", {"mode": "uq", "num_years": 1})
+
+        response = client.get("/scenarios/baseline/trace/emissions")
+        fv = response.json()["field_values"]
+
+        # Confidence intervals must be properly ordered: p5 < p25 < median < p75 < p95
+        assert fv["p5"][0] < fv["p25"][0] < fv["median"][0] < fv["p75"][0] < fv["p95"][0]
+
+    def test_uq_trace_excludes_samples_array(self, client):
+        client.post("/scenarios", json={"name": "baseline"})
+        run_and_wait(client, "baseline", {"mode": "uq", "num_years": 1})
+
+        response = client.get("/scenarios/baseline/trace/emissions")
+        data = response.json()
+
+        # Raw numpy sample arrays must be filtered out
+        assert "samples" not in data["fields"]
+        assert "samples" not in data["field_values"]
 
 
 class TestInterventionCatalog:

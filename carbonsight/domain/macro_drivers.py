@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from carbonsight.core.distributions import Distribution
 from carbonsight.core.node import Assumption, DataSource, Node, NodeType
 from carbonsight.data.models import EnergyPriceTrajectory, MacroDriverDefaults
 
@@ -171,10 +172,11 @@ def create_macro_driver_nodes(
             node_type=NodeType.TIMESERIES,
             value=defaults.oil_price_per_barrel.values,
             display_name="Oil Price Trajectory",
-            description="Projected crude oil price per barrel over the simulation horizon. From EIA Annual Energy Outlook.",
+            description="Projected crude oil price per barrel over the simulation horizon. EIA Annual Energy Outlook 2024, Reference Case.",
             data_source=DataSource(
-                name="EIA AEO 2024",
-                url="https://www.eia.gov/outlooks/aeo/",
+                name="EIA Annual Energy Outlook 2024, Table 12",
+                publication_date="2024-03",
+                url="https://www.eia.gov/outlooks/aeo/data/browser/#/?id=12-AEO2024",
             ),
             tags=["macro", "input"],
         ),
@@ -183,10 +185,11 @@ def create_macro_driver_nodes(
             node_type=NodeType.TIMESERIES,
             value=defaults.electricity_price_per_kwh.values,
             display_name="Electricity Price Trajectory",
-            description="Projected electricity price per kWh over the simulation horizon. From EIA Annual Energy Outlook.",
+            description="Projected residential electricity price per kWh. EIA Annual Energy Outlook 2024, Reference Case.",
             data_source=DataSource(
-                name="EIA AEO 2024",
-                url="https://www.eia.gov/outlooks/aeo/",
+                name="EIA Annual Energy Outlook 2024, Table 8",
+                publication_date="2024-03",
+                url="https://www.eia.gov/outlooks/aeo/data/browser/#/?id=8-AEO2024",
             ),
             tags=["macro", "input"],
         ),
@@ -202,14 +205,19 @@ def create_macro_driver_nodes(
         # Elasticity parameters
         Node(
             name="vmt_oil_price_elasticity",
-            node_type=NodeType.SCALAR,
-            value=defaults.vmt_oil_price_elasticity,
+            node_type=NodeType.DISTRIBUTION,
+            value=Distribution.normal(mean=defaults.vmt_oil_price_elasticity, std=0.05),
             display_name="VMT-Oil Price Elasticity",
-            description="Short-run elasticity of driving distance with respect to fuel price (~-0.2). Higher oil prices reduce driving.",
+            description="Short-run elasticity of driving distance with respect to fuel price (~-0.2). Normal(-0.2, 0.05).",
+            data_source=DataSource(
+                name="Hymel, K., Small, K. & Van Dender, K. (2010). Induced demand and rebound effects in road transport. Transportation Research Part B, 44(10), 1220-1241.",
+                publication_date="2010",
+                url="https://doi.org/10.1016/j.trb.2010.02.007",
+            ),
             assumptions=[
                 Assumption(
                     description="Short-run VMT elasticity w.r.t. fuel price = -0.2",
-                    rationale="energy.gov estimate for short-run response",
+                    rationale="Hymel et al. meta-analysis: short-run range -0.1 to -0.3; also consistent with DOE FOTW #1313",
                     confidence="medium",
                 )
             ],
@@ -221,6 +229,18 @@ def create_macro_driver_nodes(
             value=defaults.powertrain_pref_oil_elasticity,
             display_name="EV Preference-Oil Elasticity",
             description="Elasticity of BEV purchase preference with respect to oil price (~0.1). Higher oil prices increase EV adoption.",
+            data_source=DataSource(
+                name="Li, S., Tong, L., Xing, J. & Zhou, Y. (2017). The Market for Electric Vehicles. American Economic Review, 107(10), 2962-3000.",
+                publication_date="2017",
+                url="https://doi.org/10.1257/aer.20161492",
+            ),
+            assumptions=[
+                Assumption(
+                    description="EV preference oil-price elasticity ~0.1",
+                    rationale="Li et al. estimate cross-price elasticity of EV demand w.r.t. gasoline price; range 0.05-0.15",
+                    confidence="medium",
+                )
+            ],
             tags=["macro", "input", "adjustable"],
         ),
         Node(
@@ -229,6 +249,18 @@ def create_macro_driver_nodes(
             value=defaults.ev_elec_price_elasticity,
             display_name="EV Electricity Price Elasticity",
             description="Elasticity of BEV purchase preference with respect to electricity price (~-0.05). Higher electricity prices dampen EV adoption.",
+            data_source=DataSource(
+                name="Li, S., Tong, L., Xing, J. & Zhou, Y. (2017). The Market for Electric Vehicles. American Economic Review, 107(10), 2962-3000.",
+                publication_date="2017",
+                url="https://doi.org/10.1257/aer.20161492",
+            ),
+            assumptions=[
+                Assumption(
+                    description="EV electricity-price elasticity ~-0.05",
+                    rationale="Estimated from Li et al. operating cost sensitivity; less studied than fuel price effects",
+                    confidence="low",
+                )
+            ],
             tags=["macro", "input", "adjustable"],
         ),
         # Computed driver values

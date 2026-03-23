@@ -168,7 +168,11 @@ class SimulationGraph:
                 outputs[node_name] = overrides[node_name]
                 record.inputs = {"__override__": True}
             elif node.is_input:
-                outputs[node_name] = node.value
+                from carbonsight.core.distributions import Distribution
+                val = node.value
+                if isinstance(val, Distribution):
+                    val = val.mean()
+                outputs[node_name] = val
             else:
                 # Gather within-step inputs
                 kwargs = {}

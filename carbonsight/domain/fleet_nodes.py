@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import pandas as pd
 
+from carbonsight.core.distributions import Distribution
 from carbonsight.core.node import Assumption, DataSource, Node, NodeType
 from carbonsight.domain.fleet_dynamics import (
     DEFAULT_ANNUAL_SALES_VOLUME,
@@ -166,11 +167,11 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.DATAFRAME,
             value=survival_curves,
             display_name="Survival Curves",
-            description="Age-based probability of a vehicle remaining in service. From Greene & Leard survival model.",
+            description="Age-based probability of a vehicle remaining in service. Weibull parameters from Greene & Leard (2015) survival model.",
             data_source=DataSource(
-                name="Greene & Leard Survival Model",
-                publication_date="2024",
-                url="averaged_survival_v2.csv",
+                name="Greene, D.L. & Leard, B. (2015). Vehicle Survival and Scrappage Rates. Oak Ridge National Laboratory.",
+                publication_date="2015",
+                url="https://doi.org/10.2172/1227092",
             ),
             tags=["fleet", "input"],
         ),
@@ -179,10 +180,11 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.DATAFRAME,
             value=vmt_by_age,
             display_name="Mileage by Age",
-            description="Annual miles driven as a function of vehicle age. From NHTS 2017 survey data.",
+            description="Annual miles driven as a function of vehicle age. From the 2017 National Household Travel Survey.",
             data_source=DataSource(
-                name="NHTS 2017",
-                url="vmt_by_age.csv",
+                name="FHWA National Household Travel Survey (2017)",
+                publication_date="2017",
+                url="https://nhts.ornl.gov/",
             ),
             tags=["fleet", "input"],
         ),
@@ -191,19 +193,29 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.SCALAR,
             value=powertrain_proportions,
             display_name="New Vehicle Powertrain Mix",
-            description="Share of new vehicle sales by powertrain type (ICEV, HEV, PHEV, BEV).",
+            description="Share of new vehicle sales by powertrain type (ICEV, HEV, PHEV, BEV). From EPA Automotive Trends Report Table 3.",
+            data_source=DataSource(
+                name="EPA Automotive Trends Report (2024)",
+                publication_date="2024-12",
+                url="https://www.epa.gov/automotive-trends",
+            ),
             tags=["fleet", "input", "adjustable"],
         ),
         Node(
             name="annual_sales_volume",
-            node_type=NodeType.SCALAR,
-            value=annual_sales_volume,
+            node_type=NodeType.DISTRIBUTION,
+            value=Distribution.normal(mean=annual_sales_volume, std=1_000_000),
             display_name="Annual New Vehicle Sales",
-            description="Total new vehicles sold per year (~15.5M default). Exogenous to fleet size.",
+            description="Total new vehicles sold per year (~15.5M default). Normal(15.5M, 1M).",
+            data_source=DataSource(
+                name="Bureau of Economic Analysis, Table 7.2.5S (2024)",
+                publication_date="2024",
+                url="https://www.bea.gov/data/consumer-spending/main",
+            ),
             assumptions=[
                 Assumption(
                     description="15.5M new vehicles sold per year",
-                    rationale="2019-2024 US average (~15.3M); exogenous to fleet size",
+                    rationale="2019-2024 US average (~15.3M); std ~1M reflects macroeconomic cycle uncertainty",
                     confidence="medium",
                 )
             ],
@@ -218,7 +230,7 @@ def create_fleet_dynamics_nodes(
             assumptions=[
                 Assumption(
                     description="0% annual sales growth rate (default)",
-                    rationale="Neutral baseline; 0.3-0.5% matches historical trends",
+                    rationale="Neutral baseline; 0.3-0.5% matches historical trends per BEA data",
                     confidence="medium",
                 )
             ],
@@ -230,10 +242,15 @@ def create_fleet_dynamics_nodes(
             value=reshuffle_probability,
             display_name="Used Market Reshuffle Rate",
             description="Fraction of fleet eligible for used car market redistribution each year (~15%).",
+            data_source=DataSource(
+                name="Manheim Used Vehicle Value Index (2024)",
+                publication_date="2024",
+                url="https://publish.manheim.com/en/services/consulting/used-vehicle-value-index.html",
+            ),
             assumptions=[
                 Assumption(
                     description="15% of fleet eligible for used market reshuffling",
-                    rationale="Used vehicle market is ~3x new vehicle market, reaching ~15% of stock",
+                    rationale="Used vehicle market is ~3x new vehicle market (~40M transactions/yr for ~280M fleet)",
                     confidence="medium",
                 )
             ],
@@ -244,7 +261,12 @@ def create_fleet_dynamics_nodes(
             node_type=NodeType.DATAFRAME,
             value=new_vehicle_attrs,
             display_name="New Vehicle Characteristics",
-            description="Fuel efficiency (MPG/MPGe) and battery size for new vehicles by powertrain. Extracted from age-0 cohort of **Fleet Inventory**.",
+            description="Fuel efficiency (MPG/MPGe) and battery size for new vehicles by powertrain. Extracted from age-0 cohort of EPA fleet inventory.",
+            data_source=DataSource(
+                name="EPA Automotive Trends Report, Table 3 (2024)",
+                publication_date="2024-12",
+                url="https://www.epa.gov/automotive-trends/explore-automotive-trends-data",
+            ),
             tags=["fleet", "input"],
         ),
         Node(

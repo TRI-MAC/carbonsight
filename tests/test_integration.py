@@ -135,7 +135,7 @@ class TestFullSimulation:
         # Generate report
         report = generate_provenance_report(graph, provenance, "total_emissions", year=2024)
         assert "Provenance Report" in report
-        assert "Greene & Leard" in report or "NHTS" in report
+        assert "Greene" in report or "NHTS" in report
 
 
 class TestScenarioComparison:
