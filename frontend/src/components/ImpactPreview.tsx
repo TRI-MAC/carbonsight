@@ -306,7 +306,9 @@ export default function ImpactPreview({
                 />
                 <Tooltip
                   contentStyle={tooltipStyle}
-                  formatter={(v: number) => `${v.toFixed(1)}%`}
+                  formatter={
+                    ((v: unknown) => `${Number(v).toFixed(1)}%`) as never
+                  }
                 />
                 <Legend wrapperStyle={{ fontSize: 11, color: "#8b95a8" }} />
                 <Area

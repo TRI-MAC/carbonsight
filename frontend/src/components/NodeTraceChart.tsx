@@ -143,30 +143,30 @@ export default function NodeTraceChart({
           />
           <Tooltip
             contentStyle={tooltipStyle}
-            formatter={(value: number, name: string) => {
-              // Hide the invisible base areas from tooltip
-              if (name.endsWith("_p5") || name.endsWith("_p25")) return null;
-              if (name.endsWith("_outer"))
-                return [value.toFixed(2), "90% CI width"];
-              if (name.endsWith("_inner"))
-                return [value.toFixed(2), "50% CI width"];
-              return [value.toFixed(2), name];
-            }}
+            formatter={
+              ((value: unknown, name: unknown) => {
+                const n = String(name ?? "");
+                if (n.endsWith("_p5") || n.endsWith("_p25")) return null;
+                const v = Number(value);
+                if (n.endsWith("_outer")) return [v.toFixed(2), "90% CI width"];
+                if (n.endsWith("_inner")) return [v.toFixed(2), "50% CI width"];
+                return [v.toFixed(2), n];
+              }) as never
+            }
           />
           {showLegend && (
             <Legend
               wrapperStyle={{ fontSize: 12, color: "#8b95a8" }}
-              payload={traces.map((t, i) => {
-                const color = COLORS[i % COLORS.length];
-                if (hasUqBands(t)) {
-                  return {
-                    value: `${t.scenario} (median + CI)`,
-                    type: "line",
-                    color,
-                  };
-                }
-                return { value: t.scenario, type: "line", color };
-              })}
+              {...{
+                payload: traces.map((t, i) => ({
+                  value: hasUqBands(t)
+                    ? `${t.scenario} (median + CI)`
+                    : t.scenario,
+                  type: "line" as const,
+                  color: COLORS[i % COLORS.length],
+                  id: t.scenario,
+                })),
+              }}
             />
           )}
           {/* Render bands first (behind lines) */}

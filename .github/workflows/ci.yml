@@ -1,0 +1,186 @@
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+  issues: write
+
+env:
+  AWS_REGION: us-east-1
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "20"
+  DOMAIN: macdev-artifacts
+  DOMAIN_OWNER: "236208139397"
+  REPO: tri-cdk-test
+  AWS_GHA_ROLE_ARN: arn:aws:iam::236208139397:role/GithubActions
+
+jobs:
+  test-backend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ".[dev]"
+
+      - name: Lint
+        run: python -m ruff check .
+
+      - name: Run tests
+        run: python -m pytest tests/ -x -q
+
+  test-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run tests
+        working-directory: frontend
+        run: npx vitest run
+
+      - name: Type check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+  build:
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t carbonsight:${{ github.sha }} .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 8080:8000 carbonsight:${{ github.sha }}
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health)
+          docker stop smoke
+          if [ "$STATUS" != "200" ]; then
+            echo "Health check failed with status $STATUS"
+            exit 1
+          fi
+
+  cdk-diff:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: ${{ github.event_name == 'pull_request' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.AWS_GHA_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to CodeArtifact (pip)
+        run: |
+          aws codeartifact login \
+            --tool pip \
+            --region "$AWS_REGION" \
+            --domain "$DOMAIN" \
+            --domain-owner "$DOMAIN_OWNER" \
+            --repository "$REPO"
+
+      - name: Install CDK dependencies
+        working-directory: infra
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: CDK synth
+        working-directory: infra
+        run: npx aws-cdk@2 synth
+
+      - name: CDK diff
+        id: diff
+        working-directory: infra
+        run: |
+          set +e
+          npx aws-cdk@2 diff --no-color --fail > diff.txt 2>&1
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          {
+            echo "diff<<EOF"
+            cat diff.txt
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Comment PR with CDK diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          EXIT_CODE="${{ steps.diff.outputs.exit_code }}"
+
+          if [ "$EXIT_CODE" = "0" ]; then
+            STATUS='> [!TIP]
+          > No infrastructure changes detected.'
+          elif [ "$EXIT_CODE" = "1" ]; then
+            STATUS='> [!WARNING]
+          > Infrastructure changes detected.'
+          else
+            STATUS='> [!CAUTION]
+          > `cdk diff` failed with an execution error.'
+          fi
+
+          cat > diff-comment.md <<'COMMENT'
+          ## CDK Diff (infra)
+
+          COMMENT
+          cat >> diff-comment.md <<EOF
+          $STATUS
+
+          - Exit code: \`$EXIT_CODE\`
+          - Workflow: \`${{ github.workflow }}\`
+          - Commit: \`${{ github.sha }}\`
+
+          <details>
+          <summary>Show Diff Output</summary>
+
+          \`\`\`diff
+          ${{ steps.diff.outputs.diff }}
+          \`\`\`
+
+          </details>
+          EOF
+
+          gh pr comment "$PR_NUMBER" --body-file diff-comment.md
+
+      - name: Fail on diff execution error
+        if: ${{ steps.diff.outputs.exit_code != '0' && steps.diff.outputs.exit_code != '1' }}
+        run: exit 1

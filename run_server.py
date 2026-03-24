@@ -1,4 +1,7 @@
 """Start CarbonSight API with initialized simulation graph."""
+import os
+from pathlib import Path
+
 import uvicorn
 
 from carbonsight.app.api import app, set_graph, seed_demo_scenarios, run_scenario_by_name
@@ -32,5 +35,20 @@ for name in ["baseline", "ev-grid-intervention"]:
     print(f"Pre-ran scenario: {name}")
 
 
+# Serve frontend static files if built (production / Docker)
+static_dir = Path(__file__).parent / "static"
+if static_dir.is_dir():
+    from fastapi.responses import FileResponse
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    def serve_spa(full_path: str):
+        """Serve the SPA frontend — fall back to index.html for client-side routing."""
+        file = static_dir / full_path
+        if file.is_file():
+            return FileResponse(file)
+        return FileResponse(static_dir / "index.html")
+
+
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
