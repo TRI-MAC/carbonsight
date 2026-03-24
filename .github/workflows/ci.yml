@@ -1,6 +1,9 @@
 name: ci
 
 on:
+  push:
+    branches:
+      - deploy-infra
   pull_request:
 
 permissions:
