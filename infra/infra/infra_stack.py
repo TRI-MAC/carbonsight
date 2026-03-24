@@ -1,4 +1,5 @@
-from aws_cdk import CfnOutput
+from aws_cdk import CfnOutput, RemovalPolicy
+from aws_cdk import aws_ec2 as ec2
 from constructs import Construct
 import cdk_tri
 
@@ -23,18 +24,31 @@ class InfraStack(cdk_tri.TriStack):
             env=env,
         )
 
+        vpc = ec2.Vpc(self, "Vpc", max_azs=2)
+
+        # Workaround for tri-cdk #39: default accessLogsPrefix has trailing
+        # slash which AWS rejects. Create ALB explicitly with fixed prefix.
+        alb = cdk_tri.TriAlb(
+            self,
+            "Alb",
+            vpc=vpc,
+            access_logs_prefix="alb-access-logs",
+        )
+
         web = cdk_tri.TriWebService(
             self,
             "WebService",
             app_name=self.app_name,
             environment_name=self.environment_name,
+            alb=alb,
+            vpc=vpc,
             services=[
                 cdk_tri.TriWebServiceServiceProps(
                     service_name="carbonsight-app",
                     image_asset_path="../",
                     ports=[8000],
                     desired_count=1,
-                    healthcheck_url="/docs",
+                    healthcheck_url="/health",
                     environment={
                         "PORT": "8000",
                     },
@@ -42,6 +56,13 @@ class InfraStack(cdk_tri.TriStack):
                 ),
             ],
         )
+
+        # Workaround for tri-cdk #41: dev environment should use DESTROY
+        # removal policy so failed deploys don't leave orphaned resources.
+        if self.environment_name in ("dev", "development", "staging"):
+            for child in self.node.find_all():
+                if hasattr(child, "apply_removal_policy"):
+                    child.apply_removal_policy(RemovalPolicy.DESTROY)
 
         CfnOutput(
             self,
