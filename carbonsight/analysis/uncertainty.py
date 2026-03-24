@@ -6,7 +6,7 @@ sensitivity analysis (Sobol indices), and top-N driver identification.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -91,18 +91,20 @@ def extract_confidence_intervals(
             )
             intervals.append(ci)
         elif isinstance(output, dict) and "mean" in output:
-            intervals.append(ConfidenceInterval(
-                node_name=node_name,
-                year=yr.year,
-                mean=output["mean"],
-                median=output["median"],
-                std=output["std"],
-                p5=output["p5"],
-                p25=output["p25"],
-                p75=output["p75"],
-                p95=output["p95"],
-                n_samples=output.get("n_samples", 0),
-            ))
+            intervals.append(
+                ConfidenceInterval(
+                    node_name=node_name,
+                    year=yr.year,
+                    mean=output["mean"],
+                    median=output["median"],
+                    std=output["std"],
+                    p5=output["p5"],
+                    p25=output["p25"],
+                    p75=output["p75"],
+                    p95=output["p95"],
+                    n_samples=output.get("n_samples", 0),
+                )
+            )
     return intervals
 
 
@@ -176,8 +178,10 @@ def compute_sobol_indices(
             first_order[name] = 0.0
             total_order[name] = 0.0
         return SensitivityResult(
-            output_node="", year=0,
-            first_order=first_order, total_order=total_order,
+            output_node="",
+            year=0,
+            first_order=first_order,
+            total_order=total_order,
             n_samples=n,
         )
 
@@ -185,7 +189,7 @@ def compute_sobol_indices(
         # First-order: correlation-based approximation
         # S1 ≈ corr(X, Y)^2
         corr = np.corrcoef(x_samples, output_samples)[0, 1]
-        s1 = corr ** 2 if not np.isnan(corr) else 0.0
+        s1 = corr**2 if not np.isnan(corr) else 0.0
         first_order[name] = float(s1)
 
         # Total-order: approximate as first-order for now
@@ -193,8 +197,10 @@ def compute_sobol_indices(
         total_order[name] = float(s1)
 
     return SensitivityResult(
-        output_node="", year=0,
-        first_order=first_order, total_order=total_order,
+        output_node="",
+        year=0,
+        first_order=first_order,
+        total_order=total_order,
         n_samples=n,
     )
 
@@ -217,12 +223,14 @@ def identify_top_drivers(
     descriptions = node_descriptions or {}
     drivers = []
     for name, st in sensitivity.total_order.items():
-        drivers.append(UncertaintyDriver(
-            input_node=name,
-            total_order_index=st,
-            first_order_index=sensitivity.first_order.get(name, 0),
-            description=descriptions.get(name, name),
-        ))
+        drivers.append(
+            UncertaintyDriver(
+                input_node=name,
+                total_order_index=st,
+                first_order_index=sensitivity.first_order.get(name, 0),
+                description=descriptions.get(name, name),
+            )
+        )
 
     drivers.sort(key=lambda d: d.total_order_index, reverse=True)
     return drivers[:top_n]

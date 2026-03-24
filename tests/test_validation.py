@@ -18,20 +18,14 @@ from carbonsight.domain.emissions import (
 from carbonsight.domain.emissions_nodes import create_emissions_nodes
 from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
 from carbonsight.domain.macro_drivers import create_macro_driver_nodes
-
 from tests.fixtures.validation_references import (
     EKIDEN_V1_FLEET_SIZE,
     EKIDEN_V1_POWERTRAIN_SHARES_YEAR0,
     EKIDEN_V1_TOTAL_GHG_GRAMS,
-    GREET_BEV_75KWH_PRODUCTION_KG,
-    GREET_BEV_ANNUAL_USAGE_KG,
     GREET_BEV_PRODUCTION_RANGE,
     GREET_BEV_USAGE_RANGE,
-    GREET_ICEV_ANNUAL_USAGE_KG,
-    GREET_ICEV_PRODUCTION_KG,
     GREET_ICEV_PRODUCTION_RANGE,
     GREET_ICEV_USAGE_RANGE,
-    GREET_LIFECYCLE_TOLERANCE,
     REGRESSION_FLEET_SIZE_TOLERANCE,
     REGRESSION_GHG_TOLERANCE,
     REGRESSION_POWERTRAIN_TOLERANCE,
@@ -87,7 +81,9 @@ def _get_baseline_result():
 class TestRegressionVsEkiden:
     """Compare CarbonSight baseline against Ekiden v1 output."""
 
-    @pytest.mark.xfail(reason="CarbonSight ~2.2% above Ekiden v1 at year 0 (passes) but diverges to ~16.5% by year 9 due to different fleet turnover rates (15.5M vs 14.56M new vehicles/yr)")
+    @pytest.mark.xfail(
+        reason="CarbonSight ~2.2% above Ekiden v1 at year 0 (passes) but diverges to ~16.5% by year 9 due to different fleet turnover rates (15.5M vs 14.56M new vehicles/yr)"
+    )
     def test_total_ghg_trajectory(self):
         result = _get_baseline_result()
         for idx, yr in enumerate(result.year_results):
@@ -99,20 +95,22 @@ class TestRegressionVsEkiden:
             pct_diff = abs(cs_ghg - ekiden_ghg) / ekiden_ghg
             assert pct_diff <= REGRESSION_GHG_TOLERANCE, (
                 f"Year {idx} (sim year {yr.year}): Total GHG regression failed. "
-                f"CarbonSight={cs_ghg/1e9:.1f} Mt, Ekiden v1={ekiden_ghg/1e9:.1f} Mt, "
-                f"diff={pct_diff*100:.1f}% (tolerance={REGRESSION_GHG_TOLERANCE*100}%)"
+                f"CarbonSight={cs_ghg / 1e9:.1f} Mt, Ekiden v1={ekiden_ghg / 1e9:.1f} Mt, "
+                f"diff={pct_diff * 100:.1f}% (tolerance={REGRESSION_GHG_TOLERANCE * 100}%)"
             )
 
     def test_fleet_size_year0(self):
         result = _get_baseline_result()
         yr0 = result.year_results[0]
         fleet_snapshot = yr0.outputs.get("fleet_snapshot", {})
-        cs_total = fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+        cs_total = (
+            fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+        )
         ekiden_total = EKIDEN_V1_FLEET_SIZE[0]
         pct_diff = abs(cs_total - ekiden_total) / ekiden_total
         assert pct_diff <= REGRESSION_FLEET_SIZE_TOLERANCE, (
             f"Fleet size year 0: CarbonSight={cs_total:,.0f}, "
-            f"Ekiden v1={ekiden_total:,.0f}, diff={pct_diff*100:.1f}%"
+            f"Ekiden v1={ekiden_total:,.0f}, diff={pct_diff * 100:.1f}%"
         )
 
     def test_powertrain_mix_year0(self):
@@ -138,14 +136,16 @@ class TestRegressionVsEkiden:
         result = _get_baseline_result()
         for idx, yr in enumerate(result.year_results):
             fleet_snapshot = yr.outputs.get("fleet_snapshot", {})
-            cs_total = fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+            cs_total = (
+                fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+            )
             ekiden_total = EKIDEN_V1_FLEET_SIZE.get(idx)
             if ekiden_total is None or ekiden_total == 0:
                 continue
             pct_diff = abs(cs_total - ekiden_total) / ekiden_total
             assert pct_diff <= REGRESSION_FLEET_SIZE_TOLERANCE, (
                 f"Year {idx}: Fleet size CarbonSight={cs_total:,.0f}, "
-                f"Ekiden v1={ekiden_total:,.0f}, diff={pct_diff*100:.1f}%"
+                f"Ekiden v1={ekiden_total:,.0f}, diff={pct_diff * 100:.1f}%"
             )
 
 
@@ -154,26 +154,45 @@ class TestGREETSpotCheck:
 
     def test_icev_production_emissions(self):
         import pandas as pd
+
         # Single new ICEV
-        fleet = pd.DataFrame([{
-            "age": 0, "powertrain": "icev", "n": 1,
-            "batt_kwh": 0, "mpg": 25.0, "mpge": float("inf"),
-            "vmt": 12000, "vmt_bucket": "high",
-        }])
+        fleet = pd.DataFrame(
+            [
+                {
+                    "age": 0,
+                    "powertrain": "icev",
+                    "n": 1,
+                    "batt_kwh": 0,
+                    "mpg": 25.0,
+                    "mpge": float("inf"),
+                    "vmt": 12000,
+                    "vmt_bucket": "high",
+                }
+            ]
+        )
         result = compute_production_emissions(fleet)
         prod_ghg = result["production_ghg"].sum()
         assert GREET_ICEV_PRODUCTION_RANGE[0] <= prod_ghg <= GREET_ICEV_PRODUCTION_RANGE[1], (
-            f"ICEV production: {prod_ghg:.0f} kg CO2e, "
-            f"GREET range: {GREET_ICEV_PRODUCTION_RANGE}"
+            f"ICEV production: {prod_ghg:.0f} kg CO2e, GREET range: {GREET_ICEV_PRODUCTION_RANGE}"
         )
 
     def test_bev_production_emissions(self):
         import pandas as pd
-        fleet = pd.DataFrame([{
-            "age": 0, "powertrain": "bev", "n": 1,
-            "batt_kwh": 75.0, "mpg": float("inf"), "mpge": 100.0,
-            "vmt": 12000, "vmt_bucket": "high",
-        }])
+
+        fleet = pd.DataFrame(
+            [
+                {
+                    "age": 0,
+                    "powertrain": "bev",
+                    "n": 1,
+                    "batt_kwh": 75.0,
+                    "mpg": float("inf"),
+                    "mpge": 100.0,
+                    "vmt": 12000,
+                    "vmt_bucket": "high",
+                }
+            ]
+        )
         result = compute_production_emissions(fleet)
         prod_ghg = result["production_ghg"].sum()
         assert GREET_BEV_PRODUCTION_RANGE[0] <= prod_ghg <= GREET_BEV_PRODUCTION_RANGE[1], (
@@ -183,30 +202,48 @@ class TestGREETSpotCheck:
 
     def test_icev_annual_usage(self):
         import pandas as pd
-        fleet = pd.DataFrame([{
-            "age": 1, "powertrain": "icev", "n": 1,
-            "batt_kwh": 0, "mpg": 25.0, "mpge": float("inf"),
-            "vmt": 12000, "vmt_bucket": "high",
-        }])
+
+        fleet = pd.DataFrame(
+            [
+                {
+                    "age": 1,
+                    "powertrain": "icev",
+                    "n": 1,
+                    "batt_kwh": 0,
+                    "mpg": 25.0,
+                    "mpge": float("inf"),
+                    "vmt": 12000,
+                    "vmt_bucket": "high",
+                }
+            ]
+        )
         result = compute_usage_emissions(fleet, gas_ghg_per_gallon=8.89, grid_ghg_per_kwh=0.369)
         usage_ghg = result["use_ghg"].sum()
         assert GREET_ICEV_USAGE_RANGE[0] <= usage_ghg <= GREET_ICEV_USAGE_RANGE[1], (
-            f"ICEV annual usage: {usage_ghg:.0f} kg CO2e, "
-            f"GREET range: {GREET_ICEV_USAGE_RANGE}"
+            f"ICEV annual usage: {usage_ghg:.0f} kg CO2e, GREET range: {GREET_ICEV_USAGE_RANGE}"
         )
 
     def test_bev_annual_usage(self):
         import pandas as pd
-        fleet = pd.DataFrame([{
-            "age": 1, "powertrain": "bev", "n": 1,
-            "batt_kwh": 75.0, "mpg": float("inf"), "mpge": 100.0,
-            "vmt": 12000, "vmt_bucket": "high",
-        }])
+
+        fleet = pd.DataFrame(
+            [
+                {
+                    "age": 1,
+                    "powertrain": "bev",
+                    "n": 1,
+                    "batt_kwh": 75.0,
+                    "mpg": float("inf"),
+                    "mpge": 100.0,
+                    "vmt": 12000,
+                    "vmt_bucket": "high",
+                }
+            ]
+        )
         result = compute_usage_emissions(fleet, gas_ghg_per_gallon=8.89, grid_ghg_per_kwh=0.369)
         usage_ghg = result["use_ghg"].sum()
         assert GREET_BEV_USAGE_RANGE[0] <= usage_ghg <= GREET_BEV_USAGE_RANGE[1], (
-            f"BEV annual usage: {usage_ghg:.0f} kg CO2e, "
-            f"GREET range: {GREET_BEV_USAGE_RANGE}"
+            f"BEV annual usage: {usage_ghg:.0f} kg CO2e, GREET range: {GREET_BEV_USAGE_RANGE}"
         )
 
 
@@ -217,7 +254,9 @@ class TestVISIONSpotCheck:
         result = _get_baseline_result()
         for yr in result.year_results:
             fleet_snapshot = yr.outputs.get("fleet_snapshot", {})
-            cs_total = fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+            cs_total = (
+                fleet_snapshot.get("total_vehicles", 0) if isinstance(fleet_snapshot, dict) else 0
+            )
             assert VISION_FLEET_SIZE_MIN <= cs_total <= VISION_FLEET_SIZE_MAX, (
                 f"Year {yr.year}: fleet size {cs_total:,.0f} outside "
                 f"VISION range [{VISION_FLEET_SIZE_MIN:,.0f}, {VISION_FLEET_SIZE_MAX:,.0f}]"
@@ -237,6 +276,5 @@ class TestVISIONSpotCheck:
         bev_0 = _bev_share(yr0)
         bev_last = _bev_share(yr_last)
         assert bev_last > bev_0, (
-            f"BEV share should grow: year 0={bev_0:.3f}, "
-            f"year {yr_last.year}={bev_last:.3f}"
+            f"BEV share should grow: year 0={bev_0:.3f}, year {yr_last.year}={bev_last:.3f}"
         )

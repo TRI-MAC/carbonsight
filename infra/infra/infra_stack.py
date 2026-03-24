@@ -1,7 +1,7 @@
+import cdk_tri
 from aws_cdk import CfnOutput, RemovalPolicy
 from aws_cdk import aws_ec2 as ec2
 from constructs import Construct
-import cdk_tri
 
 
 class InfraStack(cdk_tri.TriStack):

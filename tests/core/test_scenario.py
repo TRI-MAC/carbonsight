@@ -3,11 +3,10 @@
 import numpy as np
 import pytest
 
-from carbonsight.core.engine import SimulationConfig, SimulationEngine, SimulationResult
+from carbonsight.core.engine import SimulationConfig, SimulationEngine
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.core.node import Node, NodeType
 from carbonsight.core.scenario import (
-    ComparisonDelta,
     Scenario,
     ScenarioStore,
     compare_distribution_results,
@@ -72,11 +71,14 @@ class TestScenarioSerialization:
         assert s2.overrides["carbon_price"] == 50
 
     def test_numpy_values_serialize(self):
-        s = Scenario(name="np_test", overrides={
-            "int_val": np.int64(42),
-            "float_val": np.float64(3.14),
-            "array_val": np.array([1.0, 2.0, 3.0]),
-        })
+        s = Scenario(
+            name="np_test",
+            overrides={
+                "int_val": np.int64(42),
+                "float_val": np.float64(3.14),
+                "array_val": np.array([1.0, 2.0, 3.0]),
+            },
+        )
         d = s.to_dict()
         assert isinstance(d["overrides"]["int_val"], int)
         assert isinstance(d["overrides"]["float_val"], float)
@@ -87,11 +89,13 @@ class TestScenarioComparison:
     def _run_scenario(self, rate_override=None):
         g = SimulationGraph()
         g.add_node(Node(name="rate", node_type=NodeType.SCALAR, value=0.05))
-        g.add_node(Node(
-            name="emissions",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda rate: rate * 1000,
-        ))
+        g.add_node(
+            Node(
+                name="emissions",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda rate: rate * 1000,
+            )
+        )
         config = SimulationConfig(num_years=3)
         overrides = {"rate": rate_override} if rate_override is not None else None
         return SimulationEngine(g, config).run(overrides=overrides)
@@ -197,7 +201,11 @@ class TestInterventionResolution:
             resolve_year_overrides,
         )
 
-        specs = [InterventionSpec(type="carbon_pricing", params={"price_per_tonne": 50, "start_year": 2024})]
+        specs = [
+            InterventionSpec(
+                type="carbon_pricing", params={"price_per_tonne": 50, "start_year": 2024}
+            )
+        ]
         interventions = resolve_interventions(specs)
         year_overrides = resolve_year_overrides(interventions, list(range(2024, 2034)))
         # carbon_pricing sets year_overrides for years 2024-2033
@@ -209,7 +217,9 @@ class TestInterventionResolution:
 
         s = Scenario(
             name="test",
-            interventions=[InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}})],
+            interventions=[
+                InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}})
+            ],
         )
         d = s.to_dict()
         assert len(d["interventions"]) == 1

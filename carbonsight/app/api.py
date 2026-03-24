@@ -16,8 +16,13 @@ from pydantic import BaseModel
 
 from carbonsight.core.engine import ExecutionMode, SimulationConfig, SimulationEngine
 from carbonsight.core.graph import SimulationGraph
-from carbonsight.core.node import Node, NodeType
-from carbonsight.core.scenario import InterventionSpec, Scenario, ScenarioStore, resolve_interventions, resolve_year_overrides
+from carbonsight.core.scenario import (
+    InterventionSpec,
+    Scenario,
+    ScenarioStore,
+    resolve_interventions,
+    resolve_year_overrides,
+)
 from carbonsight.domain.interventions import InterventionCategory
 
 app = FastAPI(
@@ -56,6 +61,7 @@ def set_graph(graph: SimulationGraph):
 
 # --- Request/Response Models ---
 
+
 class InterventionSpecModel(BaseModel):
     type: str
     params: dict[str, Any] = {}
@@ -88,6 +94,7 @@ class CompareRequest(BaseModel):
 
 # --- Health Check ---
 
+
 @app.get("/health")
 def health_check():
     return {"status": "ok", "version": "0.1.0"}
@@ -112,7 +119,13 @@ INTERVENTION_CATALOG = [
         "description": "EV purchase subsidy shifting powertrain mix",
         "target_node": "powertrain_proportions",
         "params": [
-            {"name": "proportion_shift", "type": "dict", "default": {"bev": 0.15}, "min": None, "max": None},
+            {
+                "name": "proportion_shift",
+                "type": "dict",
+                "default": {"bev": 0.15},
+                "min": None,
+                "max": None,
+            },
         ],
     },
     {
@@ -149,7 +162,13 @@ INTERVENTION_CATALOG = [
         "target_node": "post_scrappage",
         "params": [
             {"name": "age_threshold", "type": "int", "default": 15, "min": 5, "max": 25},
-            {"name": "acceleration_factor", "type": "float", "default": 2.0, "min": 1.1, "max": 5.0},
+            {
+                "name": "acceleration_factor",
+                "type": "float",
+                "default": 2.0,
+                "min": 1.1,
+                "max": 5.0,
+            },
             {"name": "duration_years", "type": "int", "default": 3, "min": 1, "max": 10},
             {"name": "start_year", "type": "int", "default": 0, "min": 0, "max": 2034},
         ],
@@ -252,23 +271,32 @@ _demo_cache: dict[str, Any] | None = None
 def seed_demo_scenarios():
     """Create pre-configured demo scenarios in the store."""
     if "baseline" not in scenario_store.list():
-        scenario_store.create(Scenario(
-            name="baseline",
-            overrides={},
-            metadata={"description": "Default baseline scenario"},
-        ))
+        scenario_store.create(
+            Scenario(
+                name="baseline",
+                overrides={},
+                metadata={"description": "Default baseline scenario"},
+            )
+        )
     if "ev-grid-intervention" not in scenario_store.list():
-        scenario_store.create(Scenario(
-            name="ev-grid-intervention",
-            overrides={},
-            metadata={"description": "EV subsidy + grid decarbonization"},
-            interventions=[
-                InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}}),
-                InterventionSpec(type="grid_decarbonization", params={
-                    "trajectory": {str(2024 + i): 0.369 * (1 - 0.05 * i) for i in range(10)},
-                }),
-            ],
-        ))
+        scenario_store.create(
+            Scenario(
+                name="ev-grid-intervention",
+                overrides={},
+                metadata={"description": "EV subsidy + grid decarbonization"},
+                interventions=[
+                    InterventionSpec(type="ev_subsidy", params={"proportion_shift": {"bev": 0.15}}),
+                    InterventionSpec(
+                        type="grid_decarbonization",
+                        params={
+                            "trajectory": {
+                                str(2024 + i): 0.369 * (1 - 0.05 * i) for i in range(10)
+                            },
+                        },
+                    ),
+                ],
+            )
+        )
 
 
 def run_scenario_by_name(name: str):
@@ -283,11 +311,13 @@ def run_scenario_by_name(name: str):
     year_overrides = None
     if scenario.interventions:
         intervention_objs = resolve_interventions(scenario.interventions)
-        year_overrides = resolve_year_overrides(
-            intervention_objs, list(range(2024, 2034))
-        )
+        year_overrides = resolve_year_overrides(intervention_objs, list(range(2024, 2034)))
     engine = SimulationEngine(graph, config)
-    result = engine.run(overrides=scenario.overrides, mode=ExecutionMode.DETERMINISTIC, year_overrides=year_overrides)
+    result = engine.run(
+        overrides=scenario.overrides,
+        mode=ExecutionMode.DETERMINISTIC,
+        year_overrides=year_overrides,
+    )
     _results_store[name] = result
 
 
@@ -330,26 +360,30 @@ def get_demo():
         for yr in result.year_results:
             te = yr.outputs.get("total_emissions", {})
             if isinstance(te, dict):
-                trajectory.append({
-                    "year": yr.year,
-                    "ghg": round(te.get("total_ghg", 0) / 1e9, 2),
-                    "production": round(te.get("production_ghg", 0) / 1e9, 2),
-                    "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
-                    "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
-                })
+                trajectory.append(
+                    {
+                        "year": yr.year,
+                        "ghg": round(te.get("total_ghg", 0) / 1e9, 2),
+                        "production": round(te.get("production_ghg", 0) / 1e9, 2),
+                        "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
+                        "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
+                    }
+                )
             fs = yr.outputs.get("fleet_snapshot", {})
             if isinstance(fs, dict):
                 total = fs.get("total_vehicles", 1)
                 by_pt = fs.get("by_powertrain", {})
                 if isinstance(by_pt, dict) and isinstance(total, (int, float)) and total > 0:
-                    composition.append({
-                        "year": yr.year,
-                        "total_vehicles": round(float(total)),
-                        "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
-                        "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
-                        "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
-                        "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
-                    })
+                    composition.append(
+                        {
+                            "year": yr.year,
+                            "total_vehicles": round(float(total)),
+                            "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
+                            "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
+                            "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
+                            "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
+                        }
+                    )
         return trajectory, composition
 
     b_traj, b_comp = _extract_trajectory(baseline_result)
@@ -362,13 +396,15 @@ def get_demo():
         diff = it["ghg"] - bt["ghg"]
         pct = (diff / bt["ghg"] * 100) if bt["ghg"] != 0 else 0
         cumulative_avoided += abs(diff)
-        deltas.append({
-            "year": bt["year"],
-            "baseline_ghg": bt["ghg"],
-            "intervention_ghg": it["ghg"],
-            "absolute_delta": round(diff, 2),
-            "percentage_delta": round(pct, 2),
-        })
+        deltas.append(
+            {
+                "year": bt["year"],
+                "baseline_ghg": bt["ghg"],
+                "intervention_ghg": it["ghg"],
+                "absolute_delta": round(diff, 2),
+                "percentage_delta": round(pct, 2),
+            }
+        )
 
     _demo_cache = {
         "baseline": {"trajectory": b_traj, "composition": b_comp},
@@ -378,8 +414,14 @@ def get_demo():
         "intervention_description": {
             "name": "EV Subsidy + Grid Decarbonization",
             "components": [
-                {"type": "ev_subsidy", "description": "15% BEV proportion shift in new vehicle sales"},
-                {"type": "grid_decarbonization", "description": "Grid carbon intensity declining ~50% by 2033"},
+                {
+                    "type": "ev_subsidy",
+                    "description": "15% BEV proportion shift in new vehicle sales",
+                },
+                {
+                    "type": "grid_decarbonization",
+                    "description": "Grid carbon intensity declining ~50% by 2033",
+                },
             ],
         },
         "wall_clock_seconds": round(
@@ -412,13 +454,15 @@ def get_dashboard():
         te = yr.outputs.get("total_emissions", {})
         if isinstance(te, dict):
             total_ghg = te.get("total_ghg", 0)
-            trajectory.append({
-                "year": yr.year,
-                "ghg": round(total_ghg / 1e9, 2),  # Convert to Mt CO2e
-                "production": round(te.get("production_ghg", 0) / 1e9, 2),
-                "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
-                "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
-            })
+            trajectory.append(
+                {
+                    "year": yr.year,
+                    "ghg": round(total_ghg / 1e9, 2),  # Convert to Mt CO2e
+                    "production": round(te.get("production_ghg", 0) / 1e9, 2),
+                    "usage": round(te.get("usage_ghg_total", 0) / 1e9, 2),
+                    "disposal": round(te.get("disposal_ghg", 0) / 1e9, 2),
+                }
+            )
 
         # Fleet composition
         fs = yr.outputs.get("fleet_snapshot", {})
@@ -426,15 +470,17 @@ def get_dashboard():
             total = fs.get("total_vehicles", 1)
             by_pt = fs.get("by_powertrain", {})
             if isinstance(by_pt, dict) and isinstance(total, (int, float)) and total > 0:
-                composition.append({
-                    "year": yr.year,
-                    "total_vehicles": round(float(total)),
-                    "total_vmt": round(float(fs.get("total_vmt", 0))),
-                    "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
-                    "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
-                    "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
-                    "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
-                })
+                composition.append(
+                    {
+                        "year": yr.year,
+                        "total_vehicles": round(float(total)),
+                        "total_vmt": round(float(fs.get("total_vmt", 0))),
+                        "ICEV": round(float(by_pt.get("icev", 0)) / float(total) * 100, 2),
+                        "HEV": round(float(by_pt.get("hev", 0)) / float(total) * 100, 2),
+                        "PHEV": round(float(by_pt.get("phev", 0)) / float(total) * 100, 2),
+                        "BEV": round(float(by_pt.get("bev", 0)) / float(total) * 100, 2),
+                    }
+                )
 
     # Current metrics from first year
     first_comp = composition[0] if composition else {}
@@ -458,21 +504,25 @@ def get_dashboard():
 
 # --- Scenario CRUD ---
 
+
 @app.post("/scenarios", status_code=201)
 def create_scenario(body: ScenarioCreate):
-    interventions = [
-        InterventionSpec(type=i.type, params=i.params)
-        for i in body.interventions
-    ]
+    interventions = [InterventionSpec(type=i.type, params=i.params) for i in body.interventions]
     scenario = Scenario(
-        name=body.name, overrides=body.overrides, metadata=body.metadata,
+        name=body.name,
+        overrides=body.overrides,
+        metadata=body.metadata,
         interventions=interventions,
     )
     try:
         scenario_store.create(scenario)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
-    return {"name": scenario.name, "overrides": scenario.overrides, "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions]}
+    return {
+        "name": scenario.name,
+        "overrides": scenario.overrides,
+        "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions],
+    }
 
 
 @app.get("/scenarios")
@@ -481,12 +531,16 @@ def list_scenarios():
     results = []
     for n in names:
         s = scenario_store.get(n)
-        results.append({
-            "name": n,
-            "overrides": s.overrides,
-            "metadata": s.metadata,
-            "interventions": [{"type": i.type, "params": i.params} for i in s.interventions] if s.interventions else [],
-        })
+        results.append(
+            {
+                "name": n,
+                "overrides": s.overrides,
+                "metadata": s.metadata,
+                "interventions": [{"type": i.type, "params": i.params} for i in s.interventions]
+                if s.interventions
+                else [],
+            }
+        )
     return results
 
 
@@ -502,17 +556,18 @@ def get_scenario(name: str):
 @app.put("/scenarios/{name}")
 def update_scenario(name: str, body: ScenarioUpdate):
     try:
-        scenario = scenario_store.update(
-            name, overrides=body.overrides, metadata=body.metadata
-        )
+        scenario = scenario_store.update(name, overrides=body.overrides, metadata=body.metadata)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Scenario '{name}' not found")
     if body.interventions is not None:
         scenario.interventions = [
-            InterventionSpec(type=i.type, params=i.params)
-            for i in body.interventions
+            InterventionSpec(type=i.type, params=i.params) for i in body.interventions
         ]
-    return {"name": scenario.name, "overrides": scenario.overrides, "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions]}
+    return {
+        "name": scenario.name,
+        "overrides": scenario.overrides,
+        "interventions": [{"type": i.type, "params": i.params} for i in scenario.interventions],
+    }
 
 
 @app.delete("/scenarios/{name}", status_code=204)
@@ -524,6 +579,7 @@ def delete_scenario(name: str):
 
 
 # --- Simulation Execution ---
+
 
 def _run_simulation_sync(name: str, body: RunRequest):
     """Run simulation synchronously and return (result, summary) or raise."""
@@ -570,7 +626,8 @@ def _run_simulation_sync(name: str, body: RunRequest):
                 year_outputs[node_name] = value
             elif isinstance(value, dict):
                 year_outputs[node_name] = {
-                    k: v for k, v in value.items()
+                    k: v
+                    for k, v in value.items()
                     if isinstance(v, (int, float, str, bool, list, dict))
                 }
         summary["outputs"][yr.year] = year_outputs
@@ -643,6 +700,7 @@ def get_job_status(job_id: str):
 
 # --- Scenario Comparison ---
 
+
 @app.post("/compare")
 def compare_scenarios(body: CompareRequest):
     from carbonsight.core.scenario import compare_scenarios
@@ -679,6 +737,7 @@ def compare_scenarios(body: CompareRequest):
 
 
 # --- Graph Introspection ---
+
 
 @app.get("/graph/nodes")
 def list_graph_nodes():
@@ -747,6 +806,7 @@ def get_graph_node(name: str):
 
 # --- Provenance ---
 
+
 @app.get("/scenarios/{name}/provenance/{node_name}")
 def get_provenance(name: str, node_name: str):
     from carbonsight.analysis.explainability import generate_provenance_report
@@ -759,14 +819,13 @@ def get_provenance(name: str, node_name: str):
 
     # Use provenance from the last year
     last_year = result.year_results[-1]
-    report = generate_provenance_report(
-        graph, last_year.provenance, node_name, year=last_year.year
-    )
+    report = generate_provenance_report(graph, last_year.provenance, node_name, year=last_year.year)
 
     return {"scenario": name, "node": node_name, "report": report}
 
 
 # --- Node Trace ---
+
 
 @app.get("/scenarios/{name}/trace/{node_name}")
 def get_node_trace(name: str, node_name: str):
@@ -792,6 +851,7 @@ def get_node_trace(name: str, node_name: str):
 
     # Skip DataFrame-valued nodes (not reducible to a simple timeseries)
     import pandas as pd
+
     sample = raw_values[0] if raw_values else None
     if isinstance(sample, pd.DataFrame):
         raise HTTPException(
@@ -800,11 +860,11 @@ def get_node_trace(name: str, node_name: str):
         )
 
     # Determine if scalar or dict-valued
-    is_uq = result.execution_mode == ExecutionMode.UQ
     if isinstance(sample, dict):
         # Flatten one level of nesting for small sub-dicts (e.g. by_powertrain)
         # Skip numpy arrays (e.g. 'samples' from UQ runs)
         import numpy as np
+
         flat_sample: dict = {}
         for k, v in sample.items():
             if isinstance(v, np.ndarray):
@@ -832,6 +892,7 @@ def get_node_trace(name: str, node_name: str):
     else:
         fields = None
         field_values = None
+
         def _scalar(v, yi):
             if isinstance(v, (int, float)):
                 return float(v)
@@ -855,6 +916,7 @@ def get_node_trace(name: str, node_name: str):
 
 # --- Sensitivity ---
 
+
 @app.get("/scenarios/{name}/sensitivity")
 def get_sensitivity(name: str):
     from carbonsight.analysis.uncertainty import compute_sobol_indices, identify_top_drivers
@@ -877,6 +939,7 @@ def get_sensitivity(name: str):
     for node_name, value in last_year.outputs.items():
         if isinstance(value, dict) and "samples" in value:
             import numpy as np
+
             samples = np.asarray(value["samples"])
             if output_samples is None:
                 output_samples = samples
@@ -906,6 +969,7 @@ def get_sensitivity(name: str):
 
 
 # --- Export ---
+
 
 @app.get("/scenarios/{name}/export")
 def export_scenario(name: str, format: str = "yaml"):

@@ -9,7 +9,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 MAX_VEHICLE_AGE = 50
 DEFAULT_ANNUAL_SALES_VOLUME = 15_500_000
 DEFAULT_RESHUFFLE_PROB = 0.15
@@ -35,9 +34,7 @@ def apply_scrappage(
     under_max = fleet[fleet["age"] <= MAX_VEHICLE_AGE].copy()
 
     # Merge with survival curves to get lag1_scrappage rate
-    merged = under_max.merge(
-        survival_curves[["age", "lag1_scrappage"]], on="age", how="left"
-    )
+    merged = under_max.merge(survival_curves[["age", "lag1_scrappage"]], on="age", how="left")
 
     # For ages beyond survival curve data, scrap entirely
     merged["lag1_scrappage"] = merged["lag1_scrappage"].fillna(1.0)
@@ -100,9 +97,7 @@ def add_new_vehicles(
 
             # Add powertrain-specific attributes from template
             if new_vehicle_attrs is not None:
-                pt_row = new_vehicle_attrs[
-                    new_vehicle_attrs["powertrain"] == powertrain
-                ]
+                pt_row = new_vehicle_attrs[new_vehicle_attrs["powertrain"] == powertrain]
                 if len(pt_row) > 0:
                     pt_row = pt_row.iloc[0]
                     for col in ["mpg", "mpge", "batt_kwh", "ev_range"]:
@@ -122,9 +117,7 @@ def add_new_vehicles(
     return result
 
 
-def assign_vmt_by_age(
-    fleet: pd.DataFrame, vmt_table: pd.DataFrame
-) -> pd.DataFrame:
+def assign_vmt_by_age(fleet: pd.DataFrame, vmt_table: pd.DataFrame) -> pd.DataFrame:
     """Reassign VMT to each cohort based on age and VMT bucket.
 
     Args:
@@ -196,8 +189,12 @@ def reshuffle_used_market(
     result = fleet.copy()
 
     for (age, pt), group in result.groupby(["age", "powertrain"]):
-        high_mask = (result["age"] == age) & (result["powertrain"] == pt) & (result["vmt_bucket"] == "high")
-        low_mask = (result["age"] == age) & (result["powertrain"] == pt) & (result["vmt_bucket"] == "low")
+        high_mask = (
+            (result["age"] == age) & (result["powertrain"] == pt) & (result["vmt_bucket"] == "high")
+        )
+        low_mask = (
+            (result["age"] == age) & (result["powertrain"] == pt) & (result["vmt_bucket"] == "low")
+        )
 
         n_high = result.loc[high_mask, "n"].values
         n_low = result.loc[low_mask, "n"].values
@@ -242,7 +239,7 @@ def validate_survival_curves(survival_curves: pd.DataFrame) -> None:
         if survival_vals[i] > survival_vals[i - 1]:
             raise ValueError(
                 f"Survival curve is not monotonically non-increasing: "
-                f"survival increases from age {sorted_surv['age'].iloc[i-1]} "
+                f"survival increases from age {sorted_surv['age'].iloc[i - 1]} "
                 f"to age {sorted_surv['age'].iloc[i]}"
             )
 
@@ -263,9 +260,7 @@ def validate_powertrain_proportions(proportions: dict[str, float]) -> None:
     """Validate powertrain proportions sum to ~1.0."""
     total = sum(proportions.values())
     if not (0.999 <= total <= 1.001):
-        raise ValueError(
-            f"Powertrain proportions must sum to 1.0 (got {total:.6f})"
-        )
+        raise ValueError(f"Powertrain proportions must sum to 1.0 (got {total:.6f})")
 
 
 def step_fleet_one_year(
@@ -302,9 +297,7 @@ def step_fleet_one_year(
     fleet, scrapped = apply_scrappage(fleet, survival_curves)
 
     # 3. Add new vehicles
-    fleet = add_new_vehicles(
-        fleet, powertrain_proportions, n_new, new_vehicle_attrs
-    )
+    fleet = add_new_vehicles(fleet, powertrain_proportions, n_new, new_vehicle_attrs)
 
     # 4. Assign VMT by age
     fleet = assign_vmt_by_age(fleet, vmt_table)

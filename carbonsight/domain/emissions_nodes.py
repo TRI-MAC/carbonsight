@@ -32,9 +32,7 @@ def compute_fleet_usage_ghg(
     grid_ghg_per_kwh: float,
 ) -> pd.DataFrame:
     """DAG compute: usage emissions (gas + electric)."""
-    return compute_usage_emissions(
-        fleet_production_ghg, gas_ghg_per_gallon, grid_ghg_per_kwh
-    )
+    return compute_usage_emissions(fleet_production_ghg, gas_ghg_per_gallon, grid_ghg_per_kwh)
 
 
 def compute_scrapped_disposal_ghg(

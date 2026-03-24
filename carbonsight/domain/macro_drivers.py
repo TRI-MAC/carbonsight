@@ -6,8 +6,7 @@ with elasticity-based causal propagation to downstream nodes (VMT, powertrain mi
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from carbonsight.core.distributions import Distribution
 from carbonsight.core.node import Assumption, DataSource, Node, NodeType
@@ -114,13 +113,14 @@ def query_causal_links(
     """Query which drivers affect which nodes (or vice versa)."""
     links = DEFAULT_ELASTICITIES
     if driver:
-        links = [l for l in links if l.driver_node == driver]
+        links = [link for link in links if link.driver_node == driver]
     if target:
-        links = [l for l in links if l.target_node == target]
+        links = [link for link in links if link.target_node == target]
     return links
 
 
 # --- DAG node compute functions ---
+
 
 def compute_oil_price_node(oil_price_trajectory: list, year_index: int) -> float:
     """Extract current year's oil price from trajectory."""
@@ -128,17 +128,13 @@ def compute_oil_price_node(oil_price_trajectory: list, year_index: int) -> float
     return oil_price_trajectory[max(0, idx)]
 
 
-def compute_electricity_price_node(
-    electricity_price_trajectory: list, year_index: int
-) -> float:
+def compute_electricity_price_node(electricity_price_trajectory: list, year_index: int) -> float:
     """Extract current year's electricity price from trajectory."""
     idx = min(year_index, len(electricity_price_trajectory) - 1)
     return electricity_price_trajectory[max(0, idx)]
 
 
-def compute_vmt_adjustment_node(
-    oil_price: float, vmt_oil_price_elasticity: float
-) -> float:
+def compute_vmt_adjustment_node(oil_price: float, vmt_oil_price_elasticity: float) -> float:
     """DAG compute: VMT adjustment from oil price."""
     return compute_vmt_adjustment(oil_price, elasticity=vmt_oil_price_elasticity)
 
@@ -154,7 +150,9 @@ def compute_pt_pref_shift_node(
         oil_price, elasticity=powertrain_pref_oil_elasticity
     )
     baseline_elec_price = 0.130  # $/kWh, first value in default EIA AEO trajectory
-    elec_effect = apply_elasticity(1.0, baseline_elec_price, electricity_price, ev_elec_price_elasticity)
+    elec_effect = apply_elasticity(
+        1.0, baseline_elec_price, electricity_price, ev_elec_price_elasticity
+    )
     return oil_effect * elec_effect
 
 

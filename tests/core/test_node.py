@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from carbonsight.core.distributions import Distribution
-from carbonsight.core.node import Node, NodeType, TEMPORAL_PREFIX
+from carbonsight.core.node import Node, NodeType
 
 
 class TestNodeTyping:

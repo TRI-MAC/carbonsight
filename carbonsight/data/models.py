@@ -9,7 +9,9 @@ class EmissionsFactors(BaseModel):
     """Component-level production, usage, and disposal emission factors."""
 
     # Production (kg CO2)
-    production_body: float = Field(default=4200, description="Body manufacturing emissions (kg CO2)")
+    production_body: float = Field(
+        default=4200, description="Body manufacturing emissions (kg CO2)"
+    )
     production_body_low: float = Field(default=3500)
     production_body_high: float = Field(default=5000)
 
@@ -17,16 +19,22 @@ class EmissionsFactors(BaseModel):
     production_ice_low: float = Field(default=1000)
     production_ice_high: float = Field(default=1800)
 
-    production_battery_per_kwh: float = Field(default=100, description="Battery manufacturing (kg CO2/kWh)")
+    production_battery_per_kwh: float = Field(
+        default=100, description="Battery manufacturing (kg CO2/kWh)"
+    )
     production_battery_per_kwh_low: float = Field(default=30)
     production_battery_per_kwh_high: float = Field(default=200)
 
     # Usage
-    gas_ghg_per_gallon: float = Field(default=8.89, description="Gasoline GHG intensity (kg CO2/gallon)")
+    gas_ghg_per_gallon: float = Field(
+        default=8.89, description="Gasoline GHG intensity (kg CO2/gallon)"
+    )
     grid_ghg_per_kwh: float = Field(default=0.369, description="Grid carbon intensity (kg CO2/kWh)")
 
     # Disposal (kg CO2)
-    disposal_per_vehicle: float = Field(default=2800, description="End-of-life recycling emissions (kg CO2)")
+    disposal_per_vehicle: float = Field(
+        default=2800, description="End-of-life recycling emissions (kg CO2)"
+    )
     disposal_per_vehicle_low: float = Field(default=2000)
     disposal_per_vehicle_high: float = Field(default=3500)
 

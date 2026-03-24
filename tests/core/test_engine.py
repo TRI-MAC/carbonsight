@@ -76,12 +76,14 @@ class TestOutputChaining:
         """A node with a temporal edge should see prior year's outputs."""
         g = SimulationGraph()
         # counter starts at 0, increments by 1 each year via temporal edge
-        g.add_node(Node(
-            name="counter",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_counter: prev_counter + 1,
-            initial_value=0,
-        ))
+        g.add_node(
+            Node(
+                name="counter",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_counter: prev_counter + 1,
+                initial_value=0,
+            )
+        )
 
         config = SimulationConfig(num_years=5)
         result = SimulationEngine(g, config).run()
@@ -97,11 +99,13 @@ class TestOutputChaining:
     def test_overrides_applied_every_year(self):
         g = SimulationGraph()
         g.add_node(_make_input("rate", 0.05))
-        g.add_node(Node(
-            name="result",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda rate: rate * 100,
-        ))
+        g.add_node(
+            Node(
+                name="result",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda rate: rate * 100,
+            )
+        )
 
         result = SimulationEngine(g).run(overrides={"rate": 0.10})
         for yr in result.year_results:
@@ -111,17 +115,21 @@ class TestOutputChaining:
 class TestTemporalEdgeResolution:
     def test_year_0_uses_initial_value(self):
         g = SimulationGraph()
-        g.add_node(Node(
-            name="stock",
-            node_type=NodeType.SCALAR,
-            value=100.0,
-            initial_value=100.0,
-        ))
-        g.add_node(Node(
-            name="growth",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_stock: prev_stock * 1.1,
-        ))
+        g.add_node(
+            Node(
+                name="stock",
+                node_type=NodeType.SCALAR,
+                value=100.0,
+                initial_value=100.0,
+            )
+        )
+        g.add_node(
+            Node(
+                name="growth",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_stock: prev_stock * 1.1,
+            )
+        )
 
         result = SimulationEngine(g, SimulationConfig(num_years=3)).run()
         # Year 0: prev_stock = initial(100) -> 110
@@ -131,28 +139,34 @@ class TestTemporalEdgeResolution:
 
     def test_missing_initial_value_rejected(self):
         g = SimulationGraph()
-        g.add_node(Node(
-            name="computed",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_computed: prev_computed + 1,
-            # No initial_value provided for self-referencing temporal edge
-        ))
+        g.add_node(
+            Node(
+                name="computed",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_computed: prev_computed + 1,
+                # No initial_value provided for self-referencing temporal edge
+            )
+        )
         with pytest.raises(MissingInitialValueError):
             SimulationEngine(g).run()
 
     def test_provenance_distinguishes_temporal_edges(self):
         g = SimulationGraph()
-        g.add_node(Node(
-            name="x",
-            node_type=NodeType.SCALAR,
-            value=5.0,
-            initial_value=5.0,
-        ))
-        g.add_node(Node(
-            name="y",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_x: prev_x + 1,
-        ))
+        g.add_node(
+            Node(
+                name="x",
+                node_type=NodeType.SCALAR,
+                value=5.0,
+                initial_value=5.0,
+            )
+        )
+        g.add_node(
+            Node(
+                name="y",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_x: prev_x + 1,
+            )
+        )
 
         result = SimulationEngine(g, SimulationConfig(num_years=2)).run()
 
@@ -178,17 +192,21 @@ class TestFeedbackLoop:
         preference which influences this year's fleet comp.
         """
         g = SimulationGraph()
-        g.add_node(Node(
-            name="pref",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_fleet_comp: prev_fleet_comp * 0.8 + 0.2,
-        ))
-        g.add_node(Node(
-            name="fleet_comp",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda pref: pref * 1.5,
-            initial_value=0.5,  # for pref's temporal edge
-        ))
+        g.add_node(
+            Node(
+                name="pref",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_fleet_comp: prev_fleet_comp * 0.8 + 0.2,
+            )
+        )
+        g.add_node(
+            Node(
+                name="fleet_comp",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda pref: pref * 1.5,
+                initial_value=0.5,  # for pref's temporal edge
+            )
+        )
         g.get_node("fleet_comp").initial_value = 0.5
 
         result = SimulationEngine(g, SimulationConfig(num_years=5)).run()
@@ -211,11 +229,13 @@ class TestYearSpecificOverrides:
     def test_year_specific_override_applied(self):
         g = SimulationGraph()
         g.add_node(_make_input("rate", 0.05))
-        g.add_node(Node(
-            name="result",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda rate: rate * 100,
-        ))
+        g.add_node(
+            Node(
+                name="result",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda rate: rate * 100,
+            )
+        )
 
         config = SimulationConfig(start_year=2024, num_years=3)
         result = SimulationEngine(g, config).run(
@@ -228,11 +248,13 @@ class TestYearSpecificOverrides:
     def test_year_specific_takes_precedence_over_base(self):
         g = SimulationGraph()
         g.add_node(_make_input("rate", 0.05))
-        g.add_node(Node(
-            name="result",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda rate: rate * 100,
-        ))
+        g.add_node(
+            Node(
+                name="result",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda rate: rate * 100,
+            )
+        )
 
         config = SimulationConfig(start_year=2024, num_years=3)
         result = SimulationEngine(g, config).run(
@@ -249,11 +271,13 @@ class TestYearSpecificOverrides:
 
         g = SimulationGraph()
         g.add_node(_make_input("rate", 0.05))
-        g.add_node(Node(
-            name="result",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda rate: rate * 100,
-        ))
+        g.add_node(
+            Node(
+                name="result",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda rate: rate * 100,
+            )
+        )
 
         config = SimulationConfig(start_year=2024, num_years=2, uq_samples=5)
         result = SimulationEngine(g, config).run(

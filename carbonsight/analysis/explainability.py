@@ -6,11 +6,11 @@ data source lineage, assumption documentation, and report generation.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from carbonsight.core.graph import ProvenanceRecord, SimulationGraph
-from carbonsight.core.node import Assumption, DataSource, Node
+from carbonsight.core.node import Assumption, DataSource
 
 
 @dataclass
@@ -136,9 +136,7 @@ def compute_intervention_attribution(
     Uses additive decomposition with interaction term.
     """
     total_delta = combined_value - baseline_value
-    per_intervention = {
-        name: val - baseline_value for name, val in individual_effects.items()
-    }
+    per_intervention = {name: val - baseline_value for name, val in individual_effects.items()}
     sum_individual = sum(per_intervention.values())
     interaction = total_delta - sum_individual
 
@@ -181,10 +179,13 @@ def generate_provenance_report(
     lines.append("## Input Chain")
     for record in chain.chain:
         inputs_str = ", ".join(f"{k}" for k in record.inputs.keys()) if record.inputs else "none"
-        temporal_str = ", ".join(
-            f"{k} (from {v.get('source_year', '?')})"
-            for k, v in record.temporal_inputs.items()
-        ) if record.temporal_inputs else ""
+        temporal_str = (
+            ", ".join(
+                f"{k} (from {v.get('source_year', '?')})" for k, v in record.temporal_inputs.items()
+            )
+            if record.temporal_inputs
+            else ""
+        )
         fn_str = f" via `{record.compute_fn_name}`" if record.compute_fn_name else " (input)"
         lines.append(f"- **{record.node_name}**{fn_str}")
         if inputs_str != "none":

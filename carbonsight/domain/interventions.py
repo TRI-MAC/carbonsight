@@ -6,7 +6,6 @@ multi-intervention combination with conflict detection, and scenario differencin
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
@@ -66,6 +65,7 @@ class Intervention:
 
 # --- Pre-built intervention factories ---
 
+
 def carbon_pricing(price_per_tonne: float, start_year: int = 0) -> Intervention:
     """Create a carbon pricing policy intervention."""
     year_overrides = {}
@@ -118,14 +118,16 @@ def vmt_reduction(factor: float) -> Intervention:
     factor: fraction of VMT remaining (e.g., 0.9 = 10% reduction).
     """
     return Intervention(
-        name=f"vmt_reduction_{int((1-factor)*100)}pct",
+        name=f"vmt_reduction_{int((1 - factor) * 100)}pct",
         category=InterventionCategory.BEHAVIORAL,
-        description=f"VMT reduced to {factor*100:.0f}% of baseline",
+        description=f"VMT reduced to {factor * 100:.0f}% of baseline",
         overrides={"vmt_reduction_factor": factor},
     )
 
 
-def grid_decarbonization(trajectory: dict[int, float] | float | None = None, factor: float = 0.95) -> Intervention:
+def grid_decarbonization(
+    trajectory: dict[int, float] | float | None = None, factor: float = 0.95
+) -> Intervention:
     """Create a grid decarbonization intervention.
 
     trajectory: year -> grid_ghg_per_kwh values (legacy dict form).
@@ -137,8 +139,7 @@ def grid_decarbonization(trajectory: dict[int, float] | float | None = None, fac
     else:
         baseline_intensity = 0.369  # kg CO2e/kWh baseline
         year_overrides = {
-            2024 + i: {"grid_ghg_per_kwh": baseline_intensity * (factor ** i)}
-            for i in range(10)
+            2024 + i: {"grid_ghg_per_kwh": baseline_intensity * (factor**i)} for i in range(10)
         }
     return Intervention(
         name="grid_decarbonization",
@@ -148,7 +149,9 @@ def grid_decarbonization(trajectory: dict[int, float] | float | None = None, fac
     )
 
 
-def battery_cost_reduction(trajectory: dict[int, float] | float | None = None, factor: float = 0.95) -> Intervention:
+def battery_cost_reduction(
+    trajectory: dict[int, float] | float | None = None, factor: float = 0.95
+) -> Intervention:
     """Create a battery manufacturing decarbonization intervention.
 
     trajectory: year -> production_battery_per_kwh values (legacy dict form).
@@ -160,7 +163,7 @@ def battery_cost_reduction(trajectory: dict[int, float] | float | None = None, f
     else:
         baseline_battery = 73.0  # kg CO2e/kWh baseline
         year_overrides = {
-            2024 + i: {"production_battery_per_kwh": baseline_battery * (factor ** i)}
+            2024 + i: {"production_battery_per_kwh": baseline_battery * (factor**i)}
             for i in range(10)
         }
     return Intervention(
@@ -199,9 +202,9 @@ def scrappage_program(
 def phev_charging_improvement(charging_factor: float = 0.85) -> Intervention:
     """Create a PHEV charging behavior intervention."""
     return Intervention(
-        name=f"phev_charging_{int(charging_factor*100)}pct",
+        name=f"phev_charging_{int(charging_factor * 100)}pct",
         category=InterventionCategory.BEHAVIORAL,
-        description=f"PHEV charging factor increased to {charging_factor*100:.0f}%",
+        description=f"PHEV charging factor increased to {charging_factor * 100:.0f}%",
         overrides={"charging_factor": charging_factor},
     )
 
@@ -212,9 +215,9 @@ def oil_price_shock(factor: float = 1.5) -> Intervention:
     factor: multiplier on baseline oil price trajectory (e.g. 1.5 = 50% higher).
     """
     return Intervention(
-        name=f"oil_price_{int(factor*100)}pct",
+        name=f"oil_price_{int(factor * 100)}pct",
         category=InterventionCategory.GRID_ENERGY,
-        description=f"Oil price at {factor*100:.0f}% of baseline",
+        description=f"Oil price at {factor * 100:.0f}% of baseline",
         overrides={"oil_price_factor": factor},
     )
 
@@ -225,9 +228,9 @@ def electricity_price_change(factor: float = 0.8) -> Intervention:
     factor: multiplier on baseline electricity price (e.g. 0.8 = 20% cheaper).
     """
     return Intervention(
-        name=f"elec_price_{int(factor*100)}pct",
+        name=f"elec_price_{int(factor * 100)}pct",
         category=InterventionCategory.GRID_ENERGY,
-        description=f"Electricity price at {factor*100:.0f}% of baseline",
+        description=f"Electricity price at {factor * 100:.0f}% of baseline",
         overrides={"electricity_price_factor": factor},
     )
 
@@ -238,10 +241,7 @@ def body_manufacturing_decarb(factor: float = 0.95) -> Intervention:
     factor: annual retention factor (e.g. 0.95 = 5% annual reduction).
     """
     baseline_body = 5500.0  # kg CO2e baseline per vehicle
-    year_overrides = {
-        2024 + i: {"production_body": baseline_body * (factor ** i)}
-        for i in range(10)
-    }
+    year_overrides = {2024 + i: {"production_body": baseline_body * (factor**i)} for i in range(10)}
     return Intervention(
         name="body_decarb",
         category=InterventionCategory.TECHNOLOGY,
@@ -256,10 +256,7 @@ def ice_manufacturing_decarb(factor: float = 0.95) -> Intervention:
     factor: annual retention factor (e.g. 0.95 = 5% annual reduction).
     """
     baseline_ice = 1200.0  # kg CO2e baseline per ICE powertrain
-    year_overrides = {
-        2024 + i: {"production_ice": baseline_ice * (factor ** i)}
-        for i in range(10)
-    }
+    year_overrides = {2024 + i: {"production_ice": baseline_ice * (factor**i)} for i in range(10)}
     return Intervention(
         name="ice_decarb",
         category=InterventionCategory.TECHNOLOGY,
@@ -274,9 +271,9 @@ def disposal_reduction(factor: float = 0.8) -> Intervention:
     factor: fraction of baseline disposal emissions (e.g. 0.8 = 20% reduction).
     """
     return Intervention(
-        name=f"disposal_{int(factor*100)}pct",
+        name=f"disposal_{int(factor * 100)}pct",
         category=InterventionCategory.TECHNOLOGY,
-        description=f"End-of-life emissions reduced to {factor*100:.0f}% of baseline",
+        description=f"End-of-life emissions reduced to {factor * 100:.0f}% of baseline",
         overrides={"disposal_per_vehicle_factor": factor},
     )
 
@@ -287,9 +284,9 @@ def sales_volume_change(growth_rate: float = 0.01) -> Intervention:
     growth_rate: annual growth rate (e.g. 0.01 = 1% growth, -0.02 = 2% decline).
     """
     return Intervention(
-        name=f"sales_growth_{int(growth_rate*100)}pct",
+        name=f"sales_growth_{int(growth_rate * 100)}pct",
         category=InterventionCategory.POLICY,
-        description=f"New vehicle sales growth rate: {growth_rate*100:+.1f}%/yr",
+        description=f"New vehicle sales growth rate: {growth_rate * 100:+.1f}%/yr",
         overrides={"sales_growth_rate": growth_rate},
     )
 
@@ -300,9 +297,9 @@ def used_market_incentive(reshuffle_rate: float = 0.05) -> Intervention:
     reshuffle_rate: probability of vehicle reshuffle per year (baseline ~0.02).
     """
     return Intervention(
-        name=f"used_market_{int(reshuffle_rate*100)}pct",
+        name=f"used_market_{int(reshuffle_rate * 100)}pct",
         category=InterventionCategory.POLICY,
-        description=f"Used market reshuffle rate: {reshuffle_rate*100:.1f}%/yr",
+        description=f"Used market reshuffle rate: {reshuffle_rate * 100:.1f}%/yr",
         overrides={"reshuffle_probability": reshuffle_rate},
     )
 
@@ -322,6 +319,7 @@ def eco_driving(reduction_pct: float = 10.0) -> Intervention:
 
 # --- Multi-intervention combination ---
 
+
 def combine_interventions(
     interventions: list[Intervention],
 ) -> tuple[dict[str, Any], list[str]]:
@@ -332,9 +330,7 @@ def combine_interventions(
     Returns:
         Tuple of (combined overrides dict, list of warning messages).
     """
-    sorted_interventions = sorted(
-        interventions, key=lambda i: CATEGORY_ORDER.index(i.category)
-    )
+    sorted_interventions = sorted(interventions, key=lambda i: CATEGORY_ORDER.index(i.category))
 
     combined: dict[str, Any] = {}
     warnings_list: list[str] = []
@@ -362,9 +358,7 @@ def combine_interventions_for_year(
 
     Year-specific overrides take precedence over static overrides.
     """
-    sorted_interventions = sorted(
-        interventions, key=lambda i: CATEGORY_ORDER.index(i.category)
-    )
+    sorted_interventions = sorted(interventions, key=lambda i: CATEGORY_ORDER.index(i.category))
 
     combined: dict[str, Any] = {}
     warnings_list: list[str] = []
@@ -386,6 +380,7 @@ def combine_interventions_for_year(
 
 
 # --- Scenario differencing ---
+
 
 def compute_intervention_delta(
     baseline_outputs: dict[int, dict[str, Any]],

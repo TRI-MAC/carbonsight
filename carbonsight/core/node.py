@@ -12,7 +12,6 @@ from dataclasses import dataclass, field
 from typing import Any, Callable
 
 import numpy as np
-import pandas as pd
 
 from carbonsight.core.distributions import Distribution
 
@@ -96,7 +95,7 @@ class Node:
                 continue
             if param_name.startswith(TEMPORAL_PREFIX):
                 # Temporal edge: prev_foo -> references node "foo" from prior year
-                source_node = param_name[len(TEMPORAL_PREFIX):]
+                source_node = param_name[len(TEMPORAL_PREFIX) :]
                 self.temporal_edges.append(source_node)
             else:
                 self.upstream_edges.append(param_name)

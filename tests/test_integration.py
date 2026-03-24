@@ -4,12 +4,11 @@ Tests full 10-year simulation with fleet dynamics, emissions, interventions,
 UQ, comparison, attribution, and provenance.
 """
 
-import numpy as np
-import pytest
-
-from carbonsight.core.engine import ExecutionMode, SimulationConfig, SimulationEngine
+from carbonsight.analysis.explainability import (
+    generate_provenance_report,
+    trace_provenance_backward,
+)
 from carbonsight.core.graph import SimulationGraph
-from carbonsight.core.scenario import Scenario, ScenarioStore
 from carbonsight.data.loaders import (
     load_fleet_inventory,
     load_survival_curves,
@@ -21,14 +20,10 @@ from carbonsight.domain.emissions import (
     compute_production_emissions,
     compute_usage_emissions,
 )
+from carbonsight.domain.emissions_nodes import create_emissions_nodes
 from carbonsight.domain.fleet_dynamics import step_fleet_one_year
 from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
-from carbonsight.domain.emissions_nodes import create_emissions_nodes
 from carbonsight.domain.macro_drivers import create_macro_driver_nodes
-from carbonsight.analysis.explainability import (
-    generate_provenance_report,
-    trace_provenance_backward,
-)
 
 
 class TestFullSimulation:
@@ -42,9 +37,7 @@ class TestFullSimulation:
 
         compositions = []
         for year in range(10):
-            fleet, scrapped, comp = step_fleet_one_year(
-                fleet, survival, vmt, proportions
-            )
+            fleet, scrapped, comp = step_fleet_one_year(fleet, survival, vmt, proportions)
             compositions.append(comp)
 
         # Fleet size should remain roughly stable (scrappage ≈ new entry)
@@ -53,8 +46,12 @@ class TestFullSimulation:
         assert abs(final_total - initial_total) / initial_total < 0.15
 
         # BEV share should increase over time with 7% BEV entry rate
-        initial_bev_share = compositions[0]["by_powertrain"].get("bev", 0) / compositions[0]["total_vehicles"]
-        final_bev_share = compositions[-1]["by_powertrain"].get("bev", 0) / compositions[-1]["total_vehicles"]
+        initial_bev_share = (
+            compositions[0]["by_powertrain"].get("bev", 0) / compositions[0]["total_vehicles"]
+        )
+        final_bev_share = (
+            compositions[-1]["by_powertrain"].get("bev", 0) / compositions[-1]["total_vehicles"]
+        )
         assert final_bev_share > initial_bev_share
 
     def test_ten_year_emissions_trajectory(self):
@@ -65,9 +62,7 @@ class TestFullSimulation:
 
         annual_emissions = []
         for year in range(10):
-            fleet, scrapped, comp = step_fleet_one_year(
-                fleet, survival, vmt, proportions
-            )
+            fleet, scrapped, comp = step_fleet_one_year(fleet, survival, vmt, proportions)
             fleet_e = compute_production_emissions(fleet)
             fleet_e = compute_usage_emissions(fleet_e)
             scrapped_e = compute_disposal_emissions(scrapped)

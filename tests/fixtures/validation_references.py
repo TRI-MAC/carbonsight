@@ -89,7 +89,9 @@ GREET_US_GRID_GHG_PER_KWH = 0.369  # kg CO2e/kWh (2023 US average)
 
 # Total US light-duty vehicle fleet size range over 10 years
 # Source: VISION Reference Case, 2024-2034
-VISION_FLEET_SIZE_MIN = 260_000_000  # Relaxed slightly; CarbonSight's scrappage model is more aggressive
+VISION_FLEET_SIZE_MIN = (
+    260_000_000  # Relaxed slightly; CarbonSight's scrappage model is more aggressive
+)
 VISION_FLEET_SIZE_MAX = 300_000_000
 
 # BEV stock share expectation: grows over time in all VISION scenarios
@@ -101,6 +103,8 @@ VISION_BEV_SHARE_GROWS = True  # BEV share in year 9 > year 0
 # =============================================================================
 
 REGRESSION_GHG_TOLERANCE = 0.05  # 5% relative, per RPD success criteria
-REGRESSION_FLEET_SIZE_TOLERANCE = 0.04  # 4% relative (CarbonSight's temporal feedback loop differs from Ekiden v1)
+REGRESSION_FLEET_SIZE_TOLERANCE = (
+    0.04  # 4% relative (CarbonSight's temporal feedback loop differs from Ekiden v1)
+)
 REGRESSION_POWERTRAIN_TOLERANCE = 0.02  # 2 percentage points absolute
 GREET_LIFECYCLE_TOLERANCE = 0.20  # 20% relative

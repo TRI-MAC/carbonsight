@@ -90,8 +90,12 @@ class ScenarioStore:
             raise KeyError(f"Scenario '{name}' not found")
         return self._scenarios[name]
 
-    def update(self, name: str, overrides: dict[str, Any] | None = None,
-               metadata: dict[str, Any] | None = None) -> Scenario:
+    def update(
+        self,
+        name: str,
+        overrides: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | None = None,
+    ) -> Scenario:
         scenario = self.get(name)
         if overrides is not None:
             scenario.overrides = overrides
@@ -201,14 +205,16 @@ def compare_scenarios(
             if isinstance(b_val, (int, float)) and isinstance(i_val, (int, float)):
                 abs_delta = i_val - b_val
                 pct_delta = (abs_delta / b_val * 100) if b_val != 0 else None
-                comparison.deltas.append(ComparisonDelta(
-                    node_name=node_name,
-                    year=year,
-                    baseline_value=b_val,
-                    intervention_value=i_val,
-                    absolute_delta=abs_delta,
-                    percentage_delta=pct_delta,
-                ))
+                comparison.deltas.append(
+                    ComparisonDelta(
+                        node_name=node_name,
+                        year=year,
+                        baseline_value=b_val,
+                        intervention_value=i_val,
+                        absolute_delta=abs_delta,
+                        percentage_delta=pct_delta,
+                    )
+                )
 
     return comparison
 

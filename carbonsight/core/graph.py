@@ -7,13 +7,12 @@ topological order.
 
 from __future__ import annotations
 
-from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
 import networkx as nx
 
-from carbonsight.core.node import Node, NodeType
+from carbonsight.core.node import Node
 
 
 class GraphValidationError(Exception):
@@ -102,7 +101,11 @@ class SimulationGraph:
                         f"which does not exist"
                     )
                 src_node = self._nodes[temporal_src]
-                if src_node.initial_value is None and src_node.value is None and src_node.compute_fn is not None:
+                if (
+                    src_node.initial_value is None
+                    and src_node.value is None
+                    and src_node.compute_fn is not None
+                ):
                     raise MissingInitialValueError(
                         f"Node '{node.name}' has temporal dependency on '{temporal_src}' "
                         f"but no initial value is provided for '{temporal_src}'"
@@ -120,8 +123,7 @@ class SimulationGraph:
             cycles = list(nx.simple_cycles(self._dag))
             cycle_nodes = cycles[0] if cycles else []
             raise CycleError(
-                f"Cycle detected among within-step edges involving nodes: "
-                f"{', '.join(cycle_nodes)}"
+                f"Cycle detected among within-step edges involving nodes: {', '.join(cycle_nodes)}"
             )
 
         self._validated = True
@@ -169,6 +171,7 @@ class SimulationGraph:
                 record.inputs = {"__override__": True}
             elif node.is_input:
                 from carbonsight.core.distributions import Distribution
+
                 val = node.value
                 if isinstance(val, Distribution):
                     val = val.mean()
@@ -189,7 +192,11 @@ class SimulationGraph:
                     else:
                         # Year 0: use initial_value or current value
                         src_node = self._nodes[temporal_src]
-                        val = src_node.initial_value if src_node.initial_value is not None else src_node.value
+                        val = (
+                            src_node.initial_value
+                            if src_node.initial_value is not None
+                            else src_node.value
+                        )
                         source_year = "initial"
                     kwargs[param_name] = val
                     record.temporal_inputs[temporal_src] = {

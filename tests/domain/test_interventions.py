@@ -3,7 +3,6 @@
 import pytest
 
 from carbonsight.domain.interventions import (
-    CATEGORY_ORDER,
     Intervention,
     InterventionCategory,
     attribute_interventions,
@@ -22,9 +21,7 @@ from carbonsight.domain.interventions import (
 
 class TestInterventionCreation:
     def test_create_with_enum_category(self):
-        i = Intervention(
-            name="test", category=InterventionCategory.POLICY, overrides={"x": 1}
-        )
+        i = Intervention(name="test", category=InterventionCategory.POLICY, overrides={"x": 1})
         assert i.category == InterventionCategory.POLICY
 
     def test_create_with_string_category(self):
@@ -92,9 +89,7 @@ class TestInterventionFactories:
 
 class TestCombineInterventions:
     def test_combine_non_conflicting(self):
-        i1 = Intervention(
-            name="a", category="policy", overrides={"gas_ghg_per_gallon": 9.0}
-        )
+        i1 = Intervention(name="a", category="policy", overrides={"gas_ghg_per_gallon": 9.0})
         i2 = Intervention(
             name="b", category="technology", overrides={"production_battery_per_kwh": 80}
         )
@@ -104,12 +99,8 @@ class TestCombineInterventions:
         assert len(warns) == 0
 
     def test_conflict_detection(self):
-        i1 = Intervention(
-            name="a", category="policy", overrides={"grid_ghg_per_kwh": 0.3}
-        )
-        i2 = Intervention(
-            name="b", category="grid_energy", overrides={"grid_ghg_per_kwh": 0.2}
-        )
+        i1 = Intervention(name="a", category="policy", overrides={"grid_ghg_per_kwh": 0.3})
+        i2 = Intervention(name="b", category="grid_energy", overrides={"grid_ghg_per_kwh": 0.2})
         combined, warns = combine_interventions([i1, i2])
         assert len(warns) == 1
         assert "Conflict" in warns[0]
@@ -130,12 +121,14 @@ class TestCombineInterventions:
 
     def test_combine_for_year(self):
         i1 = Intervention(
-            name="a", category="policy",
+            name="a",
+            category="policy",
             overrides={"gas_ghg_per_gallon": 8.89},
             year_overrides={5: {"gas_ghg_per_gallon": 9.5}},
         )
         i2 = Intervention(
-            name="b", category="technology",
+            name="b",
+            category="technology",
             overrides={"production_battery_per_kwh": 100},
             year_overrides={5: {"production_battery_per_kwh": 80}},
         )

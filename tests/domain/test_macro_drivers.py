@@ -1,7 +1,6 @@
 """Tests for macro-economic drivers."""
 
-import pytest
-
+from carbonsight.core.graph import SimulationGraph
 from carbonsight.data.models import EnergyPriceTrajectory, MacroDriverDefaults
 from carbonsight.domain.macro_drivers import (
     apply_elasticity,
@@ -12,7 +11,6 @@ from carbonsight.domain.macro_drivers import (
     get_year_value,
     query_causal_links,
 )
-from carbonsight.core.graph import SimulationGraph
 
 
 class TestElasticity:
@@ -61,22 +59,16 @@ class TestPowertrainPreference:
 
 class TestTrajectory:
     def test_get_year_value(self):
-        traj = EnergyPriceTrajectory(
-            name="test", unit="$/barrel", values=[70, 75, 80, 85, 90]
-        )
+        traj = EnergyPriceTrajectory(name="test", unit="$/barrel", values=[70, 75, 80, 85, 90])
         assert get_year_value(traj, 0) == 70
         assert get_year_value(traj, 2) == 80
 
     def test_clamp_to_last(self):
-        traj = EnergyPriceTrajectory(
-            name="test", unit="$/barrel", values=[70, 75, 80]
-        )
+        traj = EnergyPriceTrajectory(name="test", unit="$/barrel", values=[70, 75, 80])
         assert get_year_value(traj, 10) == 80
 
     def test_negative_year_clamps_to_first(self):
-        traj = EnergyPriceTrajectory(
-            name="test", unit="$/barrel", values=[70, 75, 80]
-        )
+        traj = EnergyPriceTrajectory(name="test", unit="$/barrel", values=[70, 75, 80])
         assert get_year_value(traj, -1) == 70
 
 
@@ -88,12 +80,12 @@ class TestCausalLinks:
     def test_query_by_driver(self):
         links = query_causal_links(driver="oil_price")
         assert len(links) >= 2
-        assert all(l.driver_node == "oil_price" for l in links)
+        assert all(link.driver_node == "oil_price" for link in links)
 
     def test_query_by_target(self):
         links = query_causal_links(target="vmt_adjustment")
         assert len(links) >= 1
-        assert all(l.target_node == "vmt_adjustment" for l in links)
+        assert all(link.target_node == "vmt_adjustment" for link in links)
 
     def test_query_returns_empty_for_unknown(self):
         links = query_causal_links(driver="nonexistent")

@@ -22,7 +22,6 @@ from carbonsight.domain.emissions import compute_production_emissions, compute_u
 from carbonsight.domain.emissions_nodes import create_emissions_nodes
 from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
 from carbonsight.domain.macro_drivers import create_macro_driver_nodes
-
 from tests.fixtures.validation_references import (
     EKIDEN_V1_FLEET_SIZE,
     EKIDEN_V1_POWERTRAIN_SHARES_YEAR0,
@@ -35,8 +34,6 @@ from tests.fixtures.validation_references import (
     GREET_ICEV_PRODUCTION_KG,
     GREET_ICEV_PRODUCTION_RANGE,
     GREET_ICEV_USAGE_RANGE,
-    GREET_DISPOSAL_PER_VEHICLE_KG,
-    GREET_DISPOSAL_RANGE,
     REGRESSION_GHG_TOLERANCE,
     VISION_FLEET_SIZE_MAX,
     VISION_FLEET_SIZE_MIN,
@@ -60,9 +57,14 @@ def build_graph():
 
 def run_baseline():
     graph = build_graph()
-    config = SimulationConfig(start_year=2024, num_years=10, execution_mode=ExecutionMode.DETERMINISTIC)
+    config = SimulationConfig(
+        start_year=2024, num_years=10, execution_mode=ExecutionMode.DETERMINISTIC
+    )
     engine = SimulationEngine(graph, config)
-    return engine.run(overrides={"vmt_adjustment": 1.0, "powertrain_preference_shift": 1.0}, mode=ExecutionMode.DETERMINISTIC)
+    return engine.run(
+        overrides={"vmt_adjustment": 1.0, "powertrain_preference_shift": 1.0},
+        mode=ExecutionMode.DETERMINISTIC,
+    )
 
 
 def pass_fail(condition):
@@ -95,7 +97,9 @@ def generate_report():
         ekiden_ghg = EKIDEN_V1_TOTAL_GHG_GRAMS[idx]
         pct = (cs_ghg - ekiden_ghg) / ekiden_ghg * 100 if ekiden_ghg else 0
         status = pass_fail(abs(pct) <= REGRESSION_GHG_TOLERANCE * 100)
-        lines.append(f"| {yr.year} | {cs_ghg/1e9:.1f} | {ekiden_ghg/1e9:.1f} | {pct:+.1f}% | {status} |")
+        lines.append(
+            f"| {yr.year} | {cs_ghg / 1e9:.1f} | {ekiden_ghg / 1e9:.1f} | {pct:+.1f}% | {status} |"
+        )
 
     lines.append("")
 
@@ -139,27 +143,87 @@ def generate_report():
     lines.append("")
 
     # ICEV production
-    icev_fleet = pd.DataFrame([{"age": 0, "powertrain": "icev", "n": 1, "batt_kwh": 0, "mpg": 25.0, "mpge": float("inf"), "vmt": 12000, "vmt_bucket": "high"}])
+    icev_fleet = pd.DataFrame(
+        [
+            {
+                "age": 0,
+                "powertrain": "icev",
+                "n": 1,
+                "batt_kwh": 0,
+                "mpg": 25.0,
+                "mpge": float("inf"),
+                "vmt": 12000,
+                "vmt_bucket": "high",
+            }
+        ]
+    )
     icev_prod = compute_production_emissions(icev_fleet)["production_ghg"].sum()
 
     # BEV production
-    bev_fleet = pd.DataFrame([{"age": 0, "powertrain": "bev", "n": 1, "batt_kwh": 75.0, "mpg": float("inf"), "mpge": 100.0, "vmt": 12000, "vmt_bucket": "high"}])
+    bev_fleet = pd.DataFrame(
+        [
+            {
+                "age": 0,
+                "powertrain": "bev",
+                "n": 1,
+                "batt_kwh": 75.0,
+                "mpg": float("inf"),
+                "mpge": 100.0,
+                "vmt": 12000,
+                "vmt_bucket": "high",
+            }
+        ]
+    )
     bev_prod = compute_production_emissions(bev_fleet)["production_ghg"].sum()
 
     # ICEV usage
-    icev_use_fleet = pd.DataFrame([{"age": 1, "powertrain": "icev", "n": 1, "batt_kwh": 0, "mpg": 25.0, "mpge": float("inf"), "vmt": 12000, "vmt_bucket": "high"}])
+    icev_use_fleet = pd.DataFrame(
+        [
+            {
+                "age": 1,
+                "powertrain": "icev",
+                "n": 1,
+                "batt_kwh": 0,
+                "mpg": 25.0,
+                "mpge": float("inf"),
+                "vmt": 12000,
+                "vmt_bucket": "high",
+            }
+        ]
+    )
     icev_use = compute_usage_emissions(icev_use_fleet)["use_ghg"].sum()
 
     # BEV usage
-    bev_use_fleet = pd.DataFrame([{"age": 1, "powertrain": "bev", "n": 1, "batt_kwh": 75.0, "mpg": float("inf"), "mpge": 100.0, "vmt": 12000, "vmt_bucket": "high"}])
+    bev_use_fleet = pd.DataFrame(
+        [
+            {
+                "age": 1,
+                "powertrain": "bev",
+                "n": 1,
+                "batt_kwh": 75.0,
+                "mpg": float("inf"),
+                "mpge": 100.0,
+                "vmt": 12000,
+                "vmt_bucket": "high",
+            }
+        ]
+    )
     bev_use = compute_usage_emissions(bev_use_fleet)["use_ghg"].sum()
 
     lines.append("| Metric | CarbonSight | GREET Reference | GREET Range | Status |")
     lines.append("|--------|-------------|-----------------|-------------|--------|")
-    lines.append(f"| ICEV Production | {icev_prod:,.0f} kg | {GREET_ICEV_PRODUCTION_KG:,} kg | {GREET_ICEV_PRODUCTION_RANGE} | {pass_fail(GREET_ICEV_PRODUCTION_RANGE[0] <= icev_prod <= GREET_ICEV_PRODUCTION_RANGE[1])} |")
-    lines.append(f"| BEV Production (75 kWh) | {bev_prod:,.0f} kg | {GREET_BEV_75KWH_PRODUCTION_KG:,} kg | {GREET_BEV_PRODUCTION_RANGE} | {pass_fail(GREET_BEV_PRODUCTION_RANGE[0] <= bev_prod <= GREET_BEV_PRODUCTION_RANGE[1])} |")
-    lines.append(f"| ICEV Annual Usage | {icev_use:,.0f} kg | {GREET_ICEV_ANNUAL_USAGE_KG:,} kg | {GREET_ICEV_USAGE_RANGE} | {pass_fail(GREET_ICEV_USAGE_RANGE[0] <= icev_use <= GREET_ICEV_USAGE_RANGE[1])} |")
-    lines.append(f"| BEV Annual Usage | {bev_use:,.0f} kg | {GREET_BEV_ANNUAL_USAGE_KG:,} kg | {GREET_BEV_USAGE_RANGE} | {pass_fail(GREET_BEV_USAGE_RANGE[0] <= bev_use <= GREET_BEV_USAGE_RANGE[1])} |")
+    lines.append(
+        f"| ICEV Production | {icev_prod:,.0f} kg | {GREET_ICEV_PRODUCTION_KG:,} kg | {GREET_ICEV_PRODUCTION_RANGE} | {pass_fail(GREET_ICEV_PRODUCTION_RANGE[0] <= icev_prod <= GREET_ICEV_PRODUCTION_RANGE[1])} |"
+    )
+    lines.append(
+        f"| BEV Production (75 kWh) | {bev_prod:,.0f} kg | {GREET_BEV_75KWH_PRODUCTION_KG:,} kg | {GREET_BEV_PRODUCTION_RANGE} | {pass_fail(GREET_BEV_PRODUCTION_RANGE[0] <= bev_prod <= GREET_BEV_PRODUCTION_RANGE[1])} |"
+    )
+    lines.append(
+        f"| ICEV Annual Usage | {icev_use:,.0f} kg | {GREET_ICEV_ANNUAL_USAGE_KG:,} kg | {GREET_ICEV_USAGE_RANGE} | {pass_fail(GREET_ICEV_USAGE_RANGE[0] <= icev_use <= GREET_ICEV_USAGE_RANGE[1])} |"
+    )
+    lines.append(
+        f"| BEV Annual Usage | {bev_use:,.0f} kg | {GREET_BEV_ANNUAL_USAGE_KG:,} kg | {GREET_BEV_USAGE_RANGE} | {pass_fail(GREET_BEV_USAGE_RANGE[0] <= bev_use <= GREET_BEV_USAGE_RANGE[1])} |"
+    )
 
     lines.append("")
 
@@ -176,13 +240,25 @@ def generate_report():
 
     yr0_fs = result.year_results[0].outputs.get("fleet_snapshot", {})
     yr_last_fs = result.year_results[-1].outputs.get("fleet_snapshot", {})
-    bev0 = yr0_fs.get("by_powertrain", {}).get("bev", 0) / yr0_fs.get("total_vehicles", 1) if isinstance(yr0_fs, dict) else 0
-    bev_last = yr_last_fs.get("by_powertrain", {}).get("bev", 0) / yr_last_fs.get("total_vehicles", 1) if isinstance(yr_last_fs, dict) else 0
+    bev0 = (
+        yr0_fs.get("by_powertrain", {}).get("bev", 0) / yr0_fs.get("total_vehicles", 1)
+        if isinstance(yr0_fs, dict)
+        else 0
+    )
+    bev_last = (
+        yr_last_fs.get("by_powertrain", {}).get("bev", 0) / yr_last_fs.get("total_vehicles", 1)
+        if isinstance(yr_last_fs, dict)
+        else 0
+    )
 
-    lines.append(f"| Metric | Result | Reference | Status |")
-    lines.append(f"|--------|--------|-----------|--------|")
-    lines.append(f"| Fleet size range | {min(fleet_sizes):,.0f} – {max(fleet_sizes):,.0f} | {VISION_FLEET_SIZE_MIN:,} – {VISION_FLEET_SIZE_MAX:,} | {pass_fail(fleet_in_range)} |")
-    lines.append(f"| BEV share growth | {bev0*100:.1f}% → {bev_last*100:.1f}% | Increases over time | {pass_fail(bev_last > bev0)} |")
+    lines.append("| Metric | Result | Reference | Status |")
+    lines.append("|--------|--------|-----------|--------|")
+    lines.append(
+        f"| Fleet size range | {min(fleet_sizes):,.0f} – {max(fleet_sizes):,.0f} | {VISION_FLEET_SIZE_MIN:,} – {VISION_FLEET_SIZE_MAX:,} | {pass_fail(fleet_in_range)} |"
+    )
+    lines.append(
+        f"| BEV share growth | {bev0 * 100:.1f}% → {bev_last * 100:.1f}% | Increases over time | {pass_fail(bev_last > bev0)} |"
+    )
 
     lines.append("")
 
@@ -193,7 +269,9 @@ def generate_report():
     lines.append("|--------|---------|----------|")
     lines.append("| Ekiden v1 (TRI) | 2024 | Regression baseline trajectory |")
     lines.append("| Argonne GREET Model | 2024 | Per-vehicle lifecycle emission factors |")
-    lines.append("| Argonne VISION Model | 2024 Reference Case | Fleet size and composition projections |")
+    lines.append(
+        "| Argonne VISION Model | 2024 Reference Case | Fleet size and composition projections |"
+    )
     lines.append("| EPA Multi-Pollutant Standards | MY2027+ | Powertrain proportion assumptions |")
     lines.append("| NHTS | 2017 | VMT by vehicle age |")
     lines.append("| Greene & Leard | 2024 | Vehicle survival/scrappage curves |")

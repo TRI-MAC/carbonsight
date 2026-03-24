@@ -2,8 +2,6 @@
 
 import pytest
 
-from carbonsight.core.graph import SimulationGraph
-from carbonsight.core.node import Assumption, DataSource, Node, NodeType
 from carbonsight.analysis.explainability import (
     compute_intervention_attribution,
     generate_provenance_report,
@@ -11,6 +9,8 @@ from carbonsight.analysis.explainability import (
     trace_provenance_backward,
     trace_provenance_forward,
 )
+from carbonsight.core.graph import SimulationGraph
+from carbonsight.core.node import Assumption, DataSource, Node, NodeType
 
 
 @pytest.fixture
@@ -18,44 +18,50 @@ def simple_graph():
     """Graph with documented nodes for explainability testing."""
     graph = SimulationGraph()
 
-    graph.add_node(Node(
-        name="input_a",
-        node_type=NodeType.SCALAR,
-        value=10,
-        data_source=DataSource(
-            name="EPA Data", publication_date="2024", url="https://epa.gov"
-        ),
-        assumptions=[
-            Assumption(
-                description="Constant input",
-                rationale="Historical average",
-                confidence="high",
-            )
-        ],
-        tags=["input"],
-    ))
+    graph.add_node(
+        Node(
+            name="input_a",
+            node_type=NodeType.SCALAR,
+            value=10,
+            data_source=DataSource(name="EPA Data", publication_date="2024", url="https://epa.gov"),
+            assumptions=[
+                Assumption(
+                    description="Constant input",
+                    rationale="Historical average",
+                    confidence="high",
+                )
+            ],
+            tags=["input"],
+        )
+    )
 
-    graph.add_node(Node(
-        name="input_b",
-        node_type=NodeType.SCALAR,
-        value=5,
-        data_source=DataSource(name="NHTS 2017"),
-        tags=["input"],
-    ))
+    graph.add_node(
+        Node(
+            name="input_b",
+            node_type=NodeType.SCALAR,
+            value=5,
+            data_source=DataSource(name="NHTS 2017"),
+            tags=["input"],
+        )
+    )
 
-    graph.add_node(Node(
-        name="intermediate",
-        node_type=NodeType.SCALAR,
-        compute_fn=lambda input_a, input_b: input_a * input_b,
-        tags=["process"],
-    ))
+    graph.add_node(
+        Node(
+            name="intermediate",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda input_a, input_b: input_a * input_b,
+            tags=["process"],
+        )
+    )
 
-    graph.add_node(Node(
-        name="output",
-        node_type=NodeType.SCALAR,
-        compute_fn=lambda intermediate: intermediate + 1,
-        tags=["output"],
-    ))
+    graph.add_node(
+        Node(
+            name="output",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda intermediate: intermediate + 1,
+            tags=["output"],
+        )
+    )
 
     graph.validate()
     return graph
@@ -150,9 +156,7 @@ class TestInterventionAttribution:
 class TestProvenanceReport:
     def test_report_generation(self, simple_graph):
         outputs, provenance = simple_graph.execute()
-        report = generate_provenance_report(
-            simple_graph, provenance, "output", year=2024
-        )
+        report = generate_provenance_report(simple_graph, provenance, "output", year=2024)
         assert "# Provenance Report: output" in report
         assert "2024" in report
         assert "EPA Data" in report

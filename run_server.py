@@ -1,14 +1,15 @@
 """Start CarbonSight API with initialized simulation graph."""
+
 import os
 from pathlib import Path
 
 import uvicorn
 
-from carbonsight.app.api import app, set_graph, seed_demo_scenarios, run_scenario_by_name
+from carbonsight.app.api import app, run_scenario_by_name, seed_demo_scenarios, set_graph
 from carbonsight.core.graph import SimulationGraph
 from carbonsight.data.loaders import load_fleet_inventory, load_survival_curves, load_vmt_by_age
-from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
 from carbonsight.domain.emissions_nodes import create_emissions_nodes
+from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
 from carbonsight.domain.macro_drivers import create_macro_driver_nodes
 
 # Build and register the simulation graph

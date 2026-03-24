@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 import os
 
-from aws_cdk import Environment
 import cdk_tri
-
+from aws_cdk import Environment
 from infra.infra_stack import InfraStack
 
 app = cdk_tri.TriApp(

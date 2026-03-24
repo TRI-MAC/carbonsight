@@ -8,6 +8,7 @@ For the frontend, start separately:
     cd frontend && npm run dev
 Then navigate to http://localhost:5173/demo
 """
+
 import uvicorn
 
 from carbonsight.app.api import app, seed_demo_scenarios, set_graph

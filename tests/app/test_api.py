@@ -6,7 +6,17 @@ import pytest
 from fastapi.testclient import TestClient
 
 import carbonsight.app.api as api_module
-from carbonsight.app.api import app, scenario_store, set_graph, _results_store, _jobs, seed_demo_scenarios
+from carbonsight.app.api import (
+    _jobs,
+    _results_store,
+    app,
+    scenario_store,
+    seed_demo_scenarios,
+    set_graph,
+)
+from carbonsight.core.distributions import Distribution
+from carbonsight.core.graph import SimulationGraph
+from carbonsight.core.node import Node, NodeType
 
 
 def run_and_wait(client, scenario_name: str, run_json: dict, timeout: float = 10.0):
@@ -21,9 +31,6 @@ def run_and_wait(client, scenario_name: str, run_json: dict, timeout: float = 10
             return status
         time.sleep(0.05)
     raise TimeoutError(f"Job {job_id} did not complete within {timeout}s")
-from carbonsight.core.distributions import Distribution
-from carbonsight.core.graph import SimulationGraph
-from carbonsight.core.node import Node, NodeType
 
 
 @pytest.fixture(autouse=True)
@@ -39,11 +46,13 @@ def reset_state():
     graph = SimulationGraph()
     graph.add_node(Node(name="input_a", node_type=NodeType.SCALAR, value=10))
     graph.add_node(Node(name="input_b", node_type=NodeType.SCALAR, value=5))
-    graph.add_node(Node(
-        name="output",
-        node_type=NodeType.SCALAR,
-        compute_fn=lambda input_a, input_b: input_a * input_b,
-    ))
+    graph.add_node(
+        Node(
+            name="output",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda input_a, input_b: input_a * input_b,
+        )
+    )
     graph.validate()
     set_graph(graph)
     yield
@@ -63,10 +72,13 @@ class TestHealthCheck:
 
 class TestScenarioCRUD:
     def test_create_scenario(self, client):
-        response = client.post("/scenarios", json={
-            "name": "baseline",
-            "overrides": {"input_a": 20},
-        })
+        response = client.post(
+            "/scenarios",
+            json={
+                "name": "baseline",
+                "overrides": {"input_a": 20},
+            },
+        )
         assert response.status_code == 201
         assert response.json()["name"] == "baseline"
 
@@ -111,21 +123,35 @@ class TestScenarioCRUD:
 class TestSimulationExecution:
     def test_run_deterministic(self, client):
         client.post("/scenarios", json={"name": "baseline"})
-        job = run_and_wait(client, "baseline", {
-            "mode": "deterministic", "num_years": 2,
-        })
+        job = run_and_wait(
+            client,
+            "baseline",
+            {
+                "mode": "deterministic",
+                "num_years": 2,
+            },
+        )
         assert job["status"] == "completed"
         data = job["result"]
         assert data["mode"] == "deterministic"
         assert len(data["years"]) == 2
 
     def test_run_with_overrides(self, client):
-        client.post("/scenarios", json={
-            "name": "override_test", "overrides": {"input_a": 100},
-        })
-        job = run_and_wait(client, "override_test", {
-            "mode": "deterministic", "num_years": 1,
-        })
+        client.post(
+            "/scenarios",
+            json={
+                "name": "override_test",
+                "overrides": {"input_a": 100},
+            },
+        )
+        job = run_and_wait(
+            client,
+            "override_test",
+            {
+                "mode": "deterministic",
+                "num_years": 1,
+            },
+        )
         assert job["status"] == "completed"
         data = job["result"]
         # output = input_a * input_b = 100 * 5 = 500
@@ -210,16 +236,20 @@ class TestUQTrace:
     def _uq_graph(self):
         """Set up a graph with a distribution node for UQ testing."""
         graph = SimulationGraph()
-        graph.add_node(Node(
-            name="grid_intensity",
-            node_type=NodeType.DISTRIBUTION,
-            value=Distribution.normal(mean=369, std=20),
-        ))
-        graph.add_node(Node(
-            name="emissions",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda grid_intensity: grid_intensity * 10,
-        ))
+        graph.add_node(
+            Node(
+                name="grid_intensity",
+                node_type=NodeType.DISTRIBUTION,
+                value=Distribution.normal(mean=369, std=20),
+            )
+        )
+        graph.add_node(
+            Node(
+                name="emissions",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda grid_intensity: grid_intensity * 10,
+            )
+        )
         graph.validate()
         set_graph(graph)
 
@@ -291,10 +321,13 @@ class TestInterventionCatalog:
 
 class TestScenarioWithInterventions:
     def test_create_with_interventions(self, client):
-        response = client.post("/scenarios", json={
-            "name": "ev_push",
-            "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
-        })
+        response = client.post(
+            "/scenarios",
+            json={
+                "name": "ev_push",
+                "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
+            },
+        )
         assert response.status_code == 201
         data = response.json()
         assert len(data["interventions"]) == 1
@@ -302,35 +335,53 @@ class TestScenarioWithInterventions:
 
     def test_update_with_interventions(self, client):
         client.post("/scenarios", json={"name": "test"})
-        response = client.put("/scenarios/test", json={
-            "interventions": [{"type": "carbon_pricing", "params": {"price_per_tonne": 100}}],
-        })
+        response = client.put(
+            "/scenarios/test",
+            json={
+                "interventions": [{"type": "carbon_pricing", "params": {"price_per_tonne": 100}}],
+            },
+        )
         assert response.status_code == 200
         data = response.json()
         assert len(data["interventions"]) == 1
         assert data["interventions"][0]["type"] == "carbon_pricing"
 
     def test_run_with_interventions(self, client):
-        client.post("/scenarios", json={
-            "name": "test",
-            "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
-        })
-        job = run_and_wait(client, "test", {
-            "mode": "deterministic", "num_years": 2,
-        })
+        client.post(
+            "/scenarios",
+            json={
+                "name": "test",
+                "interventions": [{"type": "vmt_reduction", "params": {"factor": 0.9}}],
+            },
+        )
+        job = run_and_wait(
+            client,
+            "test",
+            {
+                "mode": "deterministic",
+                "num_years": 2,
+            },
+        )
         assert job["status"] == "completed"
         data = job["result"]
         assert data["scenario"] == "test"
         assert len(data["years"]) == 2
 
     def test_run_with_invalid_intervention_type(self, client):
-        client.post("/scenarios", json={
-            "name": "bad",
-            "interventions": [{"type": "nonexistent", "params": {}}],
-        })
-        response = client.post("/scenarios/bad/run", json={
-            "mode": "deterministic", "num_years": 1,
-        })
+        client.post(
+            "/scenarios",
+            json={
+                "name": "bad",
+                "interventions": [{"type": "nonexistent", "params": {}}],
+            },
+        )
+        response = client.post(
+            "/scenarios/bad/run",
+            json={
+                "mode": "deterministic",
+                "num_years": 1,
+            },
+        )
         assert response.status_code == 400
         assert "Unknown intervention type" in response.json()["detail"]
 
@@ -340,9 +391,13 @@ class TestDemo:
     def _full_graph(self):
         """Demo endpoint requires the full simulation graph."""
         from carbonsight.core.graph import SimulationGraph
-        from carbonsight.data.loaders import load_fleet_inventory, load_survival_curves, load_vmt_by_age
-        from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
+        from carbonsight.data.loaders import (
+            load_fleet_inventory,
+            load_survival_curves,
+            load_vmt_by_age,
+        )
         from carbonsight.domain.emissions_nodes import create_emissions_nodes
+        from carbonsight.domain.fleet_nodes import create_fleet_dynamics_nodes
         from carbonsight.domain.macro_drivers import create_macro_driver_nodes
 
         fleet = load_fleet_inventory()

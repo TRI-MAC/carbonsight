@@ -2,7 +2,6 @@
 
 import pytest
 
-from carbonsight.core.distributions import Distribution
 from carbonsight.core.graph import (
     CycleError,
     MissingInitialValueError,
@@ -40,17 +39,21 @@ class TestDAGConstruction:
     def test_accept_temporal_edge_that_would_form_cycle(self):
         """A depends on B (within-step), B depends on prev_A (temporal) -> no cycle."""
         g = SimulationGraph()
-        g.add_node(Node(
-            name="a",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda b: b * 2,
-        ))
-        g.add_node(Node(
-            name="b",
-            node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_a: prev_a + 1,
-            initial_value=0.0,  # so A has an initial for temporal resolution
-        ))
+        g.add_node(
+            Node(
+                name="a",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda b: b * 2,
+            )
+        )
+        g.add_node(
+            Node(
+                name="b",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_a: prev_a + 1,
+                initial_value=0.0,  # so A has an initial for temporal resolution
+            )
+        )
         # A's initial_value needed for B's temporal edge
         g.get_node("a").initial_value = 1.0
         g.validate()  # Should not raise
@@ -134,10 +137,12 @@ class TestTemporalExecution:
     def test_temporal_edge_uses_prior_year_outputs(self):
         g = SimulationGraph()
         g.add_node(Node(name="stock", node_type=NodeType.SCALAR, value=100.0, initial_value=100.0))
-        g.add_node(_make_computed(
-            "growth",
-            lambda prev_stock: prev_stock * 1.05,
-        ))
+        g.add_node(
+            _make_computed(
+                "growth",
+                lambda prev_stock: prev_stock * 1.05,
+            )
+        )
 
         # First execution with no prior year -> uses initial_value
         outputs1, _ = g.execute()
@@ -167,14 +172,20 @@ class TestTemporalExecution:
         """A depends on B (within-step), B depends on prev_A (temporal).
         This should work and show year-over-year dynamics."""
         g = SimulationGraph()
-        g.add_node(Node(
-            name="a", node_type=NodeType.SCALAR,
-            compute_fn=lambda b: b * 2,
-        ))
-        g.add_node(Node(
-            name="b", node_type=NodeType.SCALAR,
-            compute_fn=lambda prev_a: prev_a + 1,
-        ))
+        g.add_node(
+            Node(
+                name="a",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda b: b * 2,
+            )
+        )
+        g.add_node(
+            Node(
+                name="b",
+                node_type=NodeType.SCALAR,
+                compute_fn=lambda prev_a: prev_a + 1,
+            )
+        )
         g.get_node("a").initial_value = 1.0
 
         # Year 0: b = prev_a(initial=1) + 1 = 2, a = b*2 = 4

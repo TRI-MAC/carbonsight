@@ -73,32 +73,36 @@ class TestPowertrainProportionsLoader:
 
 class TestSchemaValidation:
     def test_invalid_fleet_inventory_rejected(self):
-        bad_df = pd.DataFrame({
-            "age": [-1],  # Negative age
-            "powertrain": ["icev"],
-            "mpg": [30.0],
-            "mpge": [None],
-            "batt_kwh": [0.0],
-            "n": [100.0],
-            "vmt": [10000.0],
-            "high_VMT_prop": [0.76],
-            "vmt_bucket": ["high"],
-        })
+        bad_df = pd.DataFrame(
+            {
+                "age": [-1],  # Negative age
+                "powertrain": ["icev"],
+                "mpg": [30.0],
+                "mpge": [None],
+                "batt_kwh": [0.0],
+                "n": [100.0],
+                "vmt": [10000.0],
+                "high_VMT_prop": [0.76],
+                "vmt_bucket": ["high"],
+            }
+        )
         with pytest.raises(Exception):  # Pandera SchemaError
             fleet_inventory_schema.validate(bad_df)
 
     def test_invalid_powertrain_rejected(self):
-        bad_df = pd.DataFrame({
-            "age": [0],
-            "powertrain": ["diesel"],  # Not in valid set
-            "mpg": [30.0],
-            "mpge": [None],
-            "batt_kwh": [0.0],
-            "n": [100.0],
-            "vmt": [10000.0],
-            "high_VMT_prop": [0.76],
-            "vmt_bucket": ["high"],
-        })
+        bad_df = pd.DataFrame(
+            {
+                "age": [0],
+                "powertrain": ["diesel"],  # Not in valid set
+                "mpg": [30.0],
+                "mpge": [None],
+                "batt_kwh": [0.0],
+                "n": [100.0],
+                "vmt": [10000.0],
+                "high_VMT_prop": [0.76],
+                "vmt_bucket": ["high"],
+            }
+        )
         with pytest.raises(Exception):
             fleet_inventory_schema.validate(bad_df)
 
@@ -108,7 +112,11 @@ class TestPydanticModels:
         ef = EmissionsFactors()
         assert ef.production_body == 4200
         assert ef.gas_ghg_per_gallon == 8.89
-        assert ef.production_battery_per_kwh_low < ef.production_battery_per_kwh < ef.production_battery_per_kwh_high
+        assert (
+            ef.production_battery_per_kwh_low
+            < ef.production_battery_per_kwh
+            < ef.production_battery_per_kwh_high
+        )
 
     def test_macro_driver_defaults(self):
         md = MacroDriverDefaults()

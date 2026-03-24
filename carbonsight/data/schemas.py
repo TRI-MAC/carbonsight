@@ -6,9 +6,7 @@ proportion data on ingest.
 
 from __future__ import annotations
 
-import pandera as pa
-from pandera import Column, DataFrameSchema, Check
-
+from pandera import Check, Column, DataFrameSchema
 
 fleet_inventory_schema = DataFrameSchema(
     {

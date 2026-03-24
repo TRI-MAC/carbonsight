@@ -1,6 +1,5 @@
 """Tests for deterministic vs UQ execution modes."""
 
-import numpy as np
 import pytest
 
 from carbonsight.core.distributions import Distribution
@@ -12,16 +11,20 @@ from carbonsight.core.node import Node, NodeType
 def _build_simple_graph_with_distribution():
     """Graph with a distribution input and a computed output."""
     g = SimulationGraph()
-    g.add_node(Node(
-        name="grid_intensity",
-        node_type=NodeType.DISTRIBUTION,
-        value=Distribution.normal(mean=369, std=20),
-    ))
-    g.add_node(Node(
-        name="emissions",
-        node_type=NodeType.SCALAR,
-        compute_fn=lambda grid_intensity: grid_intensity * 10,
-    ))
+    g.add_node(
+        Node(
+            name="grid_intensity",
+            node_type=NodeType.DISTRIBUTION,
+            value=Distribution.normal(mean=369, std=20),
+        )
+    )
+    g.add_node(
+        Node(
+            name="emissions",
+            node_type=NodeType.SCALAR,
+            compute_fn=lambda grid_intensity: grid_intensity * 10,
+        )
+    )
     return g
 
 

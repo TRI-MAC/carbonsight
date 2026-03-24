@@ -26,9 +26,7 @@ def compute_aged_fleet(prev_post_used_market: pd.DataFrame) -> pd.DataFrame:
     return age_fleet(prev_post_used_market)
 
 
-def compute_post_scrappage(
-    aged_fleet: pd.DataFrame, survival_curves: pd.DataFrame
-) -> pd.DataFrame:
+def compute_post_scrappage(aged_fleet: pd.DataFrame, survival_curves: pd.DataFrame) -> pd.DataFrame:
     """DAG compute: apply scrappage, return surviving fleet."""
     surviving, _ = apply_scrappage(aged_fleet, survival_curves)
     return surviving

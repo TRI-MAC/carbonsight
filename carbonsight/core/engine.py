@@ -67,7 +67,9 @@ class SimulationResult:
 
     def output_timeseries(self, node_name: str) -> dict[int, Any]:
         """Get a node's output value for each year."""
-        return {yr.year: yr.outputs[node_name] for yr in self.year_results if node_name in yr.outputs}
+        return {
+            yr.year: yr.outputs[node_name] for yr in self.year_results if node_name in yr.outputs
+        }
 
 
 class SimulationEngine:
@@ -126,7 +128,11 @@ class SimulationEngine:
             self._running = False
             self._active_mode = None
 
-    def _run_deterministic(self, overrides: dict[str, Any] | None, year_overrides: dict[int, dict[str, Any]] | None = None) -> SimulationResult:
+    def _run_deterministic(
+        self,
+        overrides: dict[str, Any] | None,
+        year_overrides: dict[int, dict[str, Any]] | None = None,
+    ) -> SimulationResult:
         """Run in deterministic mode: collapse distributions to point estimates."""
         from carbonsight.core.distributions import Distribution
 
@@ -152,14 +158,20 @@ class SimulationEngine:
                 overrides=step_overrides,
                 prior_year_outputs=prior_year_outputs,
             )
-            result.year_results.append(YearResult(year=year, outputs=outputs, provenance=provenance))
+            result.year_results.append(
+                YearResult(year=year, outputs=outputs, provenance=provenance)
+            )
             prior_year_outputs = outputs
 
         result.wall_clock_seconds = time.monotonic() - start_time
         self._check_performance(result)
         return result
 
-    def _run_uq(self, overrides: dict[str, Any] | None, year_overrides: dict[int, dict[str, Any]] | None = None) -> SimulationResult:
+    def _run_uq(
+        self,
+        overrides: dict[str, Any] | None,
+        year_overrides: dict[int, dict[str, Any]] | None = None,
+    ) -> SimulationResult:
         """Run in UQ mode: Monte Carlo propagation through the DAG."""
         import numpy as np
 
@@ -195,7 +207,9 @@ class SimulationEngine:
                     overrides=step_overrides,
                     prior_year_outputs=prior_year_outputs,
                 )
-                sample_year_results.append(YearResult(year=year, outputs=outputs, provenance=provenance))
+                sample_year_results.append(
+                    YearResult(year=year, outputs=outputs, provenance=provenance)
+                )
                 prior_year_outputs = outputs
 
             all_sample_results.append(
@@ -234,14 +248,18 @@ class SimulationEngine:
                     }
                 else:
                     # Non-numeric output, take from first sample
-                    aggregated_outputs[node_name] = all_sample_results[0].year_results[year_idx].outputs[node_name]
+                    aggregated_outputs[node_name] = (
+                        all_sample_results[0].year_results[year_idx].outputs[node_name]
+                    )
 
             # Use provenance from first sample as representative
-            result.year_results.append(YearResult(
-                year=year,
-                outputs=aggregated_outputs,
-                provenance=all_sample_results[0].year_results[year_idx].provenance,
-            ))
+            result.year_results.append(
+                YearResult(
+                    year=year,
+                    outputs=aggregated_outputs,
+                    provenance=all_sample_results[0].year_results[year_idx].provenance,
+                )
+            )
 
         result.wall_clock_seconds = time.monotonic() - start_time
         self._check_performance(result)

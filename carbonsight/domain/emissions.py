@@ -9,7 +9,6 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
-
 # PHEV utility factor polynomial coefficients (from Ekiden v1)
 # Maps EV range → fraction of miles on electricity
 UF_COEFFICIENTS = [10.52, -7.28, -26.37, 79.08, -77.36, 26.07]
@@ -91,7 +90,6 @@ def compute_usage_emissions(
     result = fleet.copy()
 
     # Compute EV range for BEV/PHEV where missing
-    ev_range = result.get("ev_range", pd.Series(dtype=float))
     if "ev_range" not in result.columns:
         result["ev_range"] = np.nan
 
@@ -119,9 +117,7 @@ def compute_usage_emissions(
     # Gasoline emissions: VMT * (1 - UF) / MPG * ghg_per_gallon
     gas_fraction = 1 - result["utility_factor"]
     mpg_safe = result["mpg"].fillna(np.inf)  # BEVs have no mpg
-    result["ghg_gas"] = (
-        result["n"] * result["vmt"] * gas_fraction / mpg_safe * gas_ghg_per_gallon
-    )
+    result["ghg_gas"] = result["n"] * result["vmt"] * gas_fraction / mpg_safe * gas_ghg_per_gallon
     # Zero out for BEVs (they have no gas usage)
     result.loc[result["powertrain"] == "bev", "ghg_gas"] = 0.0
 
@@ -131,8 +127,11 @@ def compute_usage_emissions(
     electricity_ghg_per_gallon_equiv = grid_ghg_per_kwh * kwh_per_gallon_equiv
     mpge_safe = result["mpge"].fillna(np.inf)  # ICEVs have no mpge
     result["ghg_electric"] = (
-        result["n"] * result["vmt"] * result["utility_factor"]
-        / mpge_safe * electricity_ghg_per_gallon_equiv
+        result["n"]
+        * result["vmt"]
+        * result["utility_factor"]
+        / mpge_safe
+        * electricity_ghg_per_gallon_equiv
     )
     # Zero out for ICEV/HEV (no electric usage)
     result.loc[result["powertrain"].isin(["icev", "hev"]), "ghg_electric"] = 0.0
@@ -180,9 +179,21 @@ def aggregate_emissions(
     by_pt = {}
     for pt in fleet_with_emissions["powertrain"].unique():
         mask = fleet_with_emissions["powertrain"] == pt
-        pt_prod = fleet_with_emissions.loc[mask, "production_ghg"].sum() if "production_ghg" in fleet_with_emissions.columns else 0
-        pt_gas = fleet_with_emissions.loc[mask, "ghg_gas"].sum() if "ghg_gas" in fleet_with_emissions.columns else 0
-        pt_elec = fleet_with_emissions.loc[mask, "ghg_electric"].sum() if "ghg_electric" in fleet_with_emissions.columns else 0
+        pt_prod = (
+            fleet_with_emissions.loc[mask, "production_ghg"].sum()
+            if "production_ghg" in fleet_with_emissions.columns
+            else 0
+        )
+        pt_gas = (
+            fleet_with_emissions.loc[mask, "ghg_gas"].sum()
+            if "ghg_gas" in fleet_with_emissions.columns
+            else 0
+        )
+        pt_elec = (
+            fleet_with_emissions.loc[mask, "ghg_electric"].sum()
+            if "ghg_electric" in fleet_with_emissions.columns
+            else 0
+        )
         by_pt[pt] = {
             "production": pt_prod,
             "usage_gas": pt_gas,

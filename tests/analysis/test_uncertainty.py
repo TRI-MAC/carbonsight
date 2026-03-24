@@ -1,17 +1,15 @@
 """Tests for uncertainty quantification analysis."""
 
 import numpy as np
-import pytest
 
-from carbonsight.core.distributions import Distribution
 from carbonsight.analysis.uncertainty import (
     ConfidenceInterval,
     check_sample_sufficiency,
     compute_sobol_indices,
-    extract_confidence_intervals,
     identify_top_drivers,
     latin_hypercube_sample,
 )
+from carbonsight.core.distributions import Distribution
 
 
 class TestConfidenceInterval:
@@ -91,8 +89,10 @@ class TestSobolIndices:
 class TestTopDrivers:
     def test_ranks_correctly(self):
         from carbonsight.analysis.uncertainty import SensitivityResult
+
         sr = SensitivityResult(
-            output_node="total_ghg", year=2024,
+            output_node="total_ghg",
+            year=2024,
             first_order={"a": 0.5, "b": 0.3, "c": 0.1},
             total_order={"a": 0.6, "b": 0.3, "c": 0.1},
             n_samples=1000,
@@ -104,14 +104,17 @@ class TestTopDrivers:
 
     def test_with_descriptions(self):
         from carbonsight.analysis.uncertainty import SensitivityResult
+
         sr = SensitivityResult(
-            output_node="total_ghg", year=2024,
+            output_node="total_ghg",
+            year=2024,
             first_order={"battery_cost": 0.5},
             total_order={"battery_cost": 0.6},
             n_samples=1000,
         )
         drivers = identify_top_drivers(
-            sr, top_n=1,
+            sr,
+            top_n=1,
             node_descriptions={"battery_cost": "Battery production cost per kWh"},
         )
         assert drivers[0].description == "Battery production cost per kWh"
